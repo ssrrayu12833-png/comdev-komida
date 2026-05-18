@@ -194,6 +194,33 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
   .admin-stats{grid-template-columns:1fr 1fr;}
   .landing-title{font-size:28px;}
 }
+
+/* Rich text editor */
+.editor-toolbar{display:flex;flex-wrap:wrap;gap:4px;padding:8px;background:var(--green1);border:1.5px solid var(--green2);border-bottom:none;border-radius:10px 10px 0 0;}
+.editor-btn{background:white;border:1px solid var(--green2);border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer;color:var(--text2);transition:all .15s;min-width:32px;text-align:center;}
+.editor-btn:hover{background:var(--green2);color:var(--green5);}
+.editor-btn.active{background:var(--green4);color:white;border-color:var(--green4);}
+.editor-content{border:1.5px solid var(--green2);border-radius:0 0 10px 10px;padding:12px 14px;min-height:160px;outline:none;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text1);line-height:1.8;background:white;overflow-y:auto;}
+.editor-content:focus{border-color:var(--green4);}
+.editor-content b,.editor-content strong{font-weight:700;}
+.editor-content i,.editor-content em{font-style:italic;}
+.editor-content u{text-decoration:underline;}
+.editor-content ul{padding-left:20px;margin:4px 0;}
+.editor-content ol{padding-left:20px;margin:4px 0;}
+.editor-content h3{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--green5);margin:8px 0 4px;}
+/* Quiz kategori tabs */
+.quiz-cat-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}
+.quiz-cat-tab{padding:6px 16px;border-radius:20px;border:1.5px solid var(--green2);background:white;color:var(--text2);font-size:13px;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;}
+.quiz-cat-tab.active{background:var(--green4);color:white;border-color:var(--green4);}
+.quiz-cat-section{margin-bottom:32px;}
+.quiz-cat-title{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--green5);margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid var(--green2);}
+/* Materi content rendered */
+.materi-rendered-content{font-size:14.5px;color:var(--text2);line-height:2;}
+.materi-rendered-content b,.materi-rendered-content strong{font-weight:700;}
+.materi-rendered-content i,.materi-rendered-content em{font-style:italic;}
+.materi-rendered-content ul{padding-left:20px;margin:8px 0;}
+.materi-rendered-content ol{padding-left:20px;margin:8px 0;}
+.materi-rendered-content h3{font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--green5);margin:12px 0 6px;}
 </style>
 </head>
 <body>
@@ -202,6 +229,69 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 
 <script>
 // ─── PALETTE & DATA ──────────────────────────────────────────────────────────
+// ─── RICH TEXT EDITOR ────────────────────────────────────────────────────────
+function createEditor(placeholder, onChange) {
+  const wrap = document.createElement('div');
+  wrap.style.marginBottom = '12px';
+
+  // Toolbar
+  const tb = el('div', {class:'editor-toolbar'});
+  const buttons = [
+    {cmd:'bold',      icon:'<b>B</b>',    title:'Bold'},
+    {cmd:'italic',    icon:'<i>I</i>',    title:'Italic'},
+    {cmd:'underline', icon:'<u>U</u>',    title:'Underline'},
+    {cmd:'sep'},
+    {cmd:'insertUnorderedList', icon:'• List', title:'Bullet List'},
+    {cmd:'insertOrderedList',   icon:'1. List', title:'Numbered List'},
+    {cmd:'sep'},
+    {cmd:'h3',        icon:'Judul',       title:'Heading'},
+    {cmd:'removeFormat', icon:'✕ Format', title:'Hapus Format'},
+  ];
+  buttons.forEach(b => {
+    if(b.cmd === 'sep') {
+      const sep = document.createElement('span');
+      sep.style.cssText = 'width:1px;background:var(--green3);margin:2px 4px;';
+      tb.appendChild(sep); return;
+    }
+    const btn = document.createElement('button');
+    btn.className = 'editor-btn';
+    btn.innerHTML = b.icon;
+    btn.title = b.title;
+    btn.type = 'button';
+    btn.onmousedown = (e) => {
+      e.preventDefault();
+      if(b.cmd === 'h3') {
+        document.execCommand('formatBlock', false, 'h3');
+      } else {
+        document.execCommand(b.cmd, false, null);
+      }
+      editor.focus();
+      onChange(editor.innerHTML);
+    };
+    tb.appendChild(btn);
+  });
+
+  // Content area
+  const editor = document.createElement('div');
+  editor.className = 'editor-content';
+  editor.contentEditable = true;
+  editor.setAttribute('placeholder', placeholder);
+  editor.style.cssText += `position:relative;`;
+  editor.oninput = () => onChange(editor.innerHTML);
+
+  // Placeholder via CSS pseudo
+  const style = document.createElement('style');
+  style.textContent = `.editor-content:empty:before{content:attr(placeholder);color:var(--text3);pointer-events:none;}`;
+  document.head.appendChild(style);
+
+  wrap.appendChild(tb);
+  wrap.appendChild(editor);
+
+  wrap.getValue = () => editor.innerHTML;
+  wrap.setValue = (v) => { editor.innerHTML = v || ''; };
+  return wrap;
+}
+
 const MODULES = [
   "Kesehatan Dasar","Keuangan","Pendidikan & Hak Anak","Kewirausahaan",
   "Kesehatan Gender","Kesehatan Anak & Wanita","Pencegahan KDRT",
@@ -501,13 +591,14 @@ function renderModul() {
     const mcard = el('div',{class:'card',style:{marginBottom:'24px'}});
     mcard.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'26px',color:'var(--text1)',marginBottom:'8px'}},activeMateri.title));
     mcard.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'16px'}},`📅 ${activeMateri.date}`));
-    const content = el('div',{style:{fontSize:'14px',color:'var(--text2)',lineHeight:'1.9',whiteSpace:'pre-wrap'}});
-    content.textContent = activeMateri.content||'';
-    if(!activeMateri.content){
+    const contentDiv = el('div',{class:'materi-rendered-content'});
+    if(activeMateri.content) {
+      contentDiv.innerHTML = activeMateri.content;
+    } else {
       const em = document.createElement('em'); em.style.color='var(--text3)';
-      em.textContent='Konten materi belum ditambahkan.'; content.appendChild(em);
+      em.textContent='Konten materi belum ditambahkan.'; contentDiv.appendChild(em);
     }
-    mcard.appendChild(content);
+    mcard.appendChild(contentDiv);
     wrap.appendChild(mcard);
 
     const fcard = el('div',{class:'card'});
@@ -624,7 +715,11 @@ function renderModul() {
       const m = modal([
         el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Tambah Materi'),
         el('input',{type:'text',placeholder:'Judul materi...',style:{marginBottom:'12px'},onInput:e=>title=e.target.value}),
-        el('textarea',{placeholder:'Isi konten materi...',rows:'8',style:{resize:'vertical',marginBottom:'16px'},onInput:e=>content=e.target.value}),
+        (() => {
+          const ed = createEditor('Isi konten materi...', v => content = v);
+          ed.style.marginBottom = '16px';
+          return ed;
+        })(),
         el('div',{style:{display:'flex',gap:'10px'}},
           el('button',{class:'btn-primary',onClick:()=>{
             if(!title.trim())return;
@@ -767,8 +862,8 @@ function renderBlog(){
     c.appendChild(el('span',{class:'tag',style:{marginBottom:'12px',display:'inline-block'}},activePost.category));
     c.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'28px',color:'var(--text1)',marginBottom:'8px',lineHeight:'1.3'}},activePost.title));
     c.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'20px'}},`📅 ${activePost.date}`));
-    const ct = el('div',{style:{fontSize:'14.5px',color:'var(--text2)',lineHeight:'2',whiteSpace:'pre-wrap'}});
-    ct.textContent = activePost.content;
+    const ct = el('div',{class:'materi-rendered-content'});
+    ct.innerHTML = activePost.content || '';
     c.appendChild(ct);
     wrap.appendChild(c);
     return wrap;
@@ -823,7 +918,11 @@ function renderBlog(){
         const s = el('select',{style:{marginBottom:'12px'},onChange:e=>form.category=e.target.value});
         cats.forEach(c=>{const o=el('option',{value:c},c);s.appendChild(o);}); return s;
       })(),
-      el('textarea',{placeholder:'Tulis konten artikel...',rows:'8',style:{resize:'vertical',marginBottom:'16px'},onInput:e=>form.content=e.target.value}),
+      (() => {
+        const ed = createEditor('Tulis konten artikel...', v => form.content = v);
+        ed.style.marginBottom = '16px';
+        return ed;
+      })(),
       el('div',{style:{display:'flex',gap:'10px'}},
         el('button',{class:'btn-primary',onClick:()=>{
           if(!form.title.trim()||!form.content.trim())return;
@@ -912,30 +1011,63 @@ function renderQuiz(){
     es.appendChild(el('div',{class:'empty-icon'},'🧩'));
     es.appendChild(el('p',{},`Belum ada quiz.${isAdmin?' Buat quiz pertama!':''}`));
     wrap.appendChild(es);
-  }
-  const grid = el('div',{class:'quiz-grid'});
-  quizzes.forEach(qz=>{
-    const qc = el('div',{class:'card quiz-card'});
-    const qcTop = el('div',{style:{cursor:'pointer'},onClick:()=>setState({activeQuiz:qz,quizView:'take',quizSubmitted:false,quizAnswers:{},quizScore:null})});
-    qcTop.appendChild(el('div',{style:{fontSize:'28px',marginBottom:'8px'}},'🧩'));
-    if(qz.category) qcTop.appendChild(el('span',{class:'tag',style:{marginBottom:'8px',display:'inline-block'}},qz.category));
-    qcTop.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'16px',color:'var(--text1)',marginBottom:'4px'}},qz.title));
-    qcTop.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)'}},`${qz.questions.length} pertanyaan · ${qz.date}`));
-    qcTop.appendChild(el('div',{style:{marginTop:'12px',fontSize:'12px',color:'var(--green5)'}},'Mulai Quiz →'));
-    qc.appendChild(qcTop);
-    if(isAdmin){
-      const qca = el('div',{class:'card-actions'});
-      qca.appendChild(el('button',{class:'btn-danger',onClick:()=>{
-        if(!confirm(`Hapus quiz "${qz.title}"?`)) return;
-        state.data.quizzes = (state.data.quizzes||[]).filter(q=>q.id!==qz.id);
-        if(qz._key) fbDelete('quizzes/'+qz._key);
-        setState({});
-      }},'🗑 Hapus'));
-      qc.appendChild(qca);
+  } else {
+    // Kelompokkan quiz per kategori
+    const cats = {};
+    quizzes.forEach(qz => {
+      const cat = qz.category || 'Umum';
+      if(!cats[cat]) cats[cat] = [];
+      cats[cat].push(qz);
+    });
+    const allCats = Object.keys(cats);
+
+    // Tab filter kategori
+    const tabsWrap = el('div',{class:'quiz-cat-tabs'});
+    let activeCat = allCats[0];
+    const tabEls = {};
+
+    function renderCatContent() {
+      catContent.innerHTML = '';
+      const grid = el('div',{class:'quiz-grid'});
+      (cats[activeCat]||[]).forEach(qz=>{
+        const qc = el('div',{class:'card quiz-card'});
+        const qcTop = el('div',{style:{cursor:'pointer'},onClick:()=>setState({activeQuiz:qz,quizView:'take',quizSubmitted:false,quizAnswers:{},quizScore:null})});
+        qcTop.appendChild(el('div',{style:{fontSize:'28px',marginBottom:'8px'}},'🧩'));
+        qcTop.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'16px',color:'var(--text1)',marginBottom:'4px'}},qz.title));
+        qcTop.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)'}},`${qz.questions.length} pertanyaan · ${qz.date}`));
+        qcTop.appendChild(el('div',{style:{marginTop:'12px',fontSize:'12px',color:'var(--green5)'}},'Mulai Quiz →'));
+        qc.appendChild(qcTop);
+        if(isAdmin){
+          const qca = el('div',{class:'card-actions'});
+          qca.appendChild(el('button',{class:'btn-danger',onClick:()=>{
+            if(!confirm(`Hapus quiz "${qz.title}"?`)) return;
+            state.data.quizzes = (state.data.quizzes||[]).filter(q=>q.id!==qz.id);
+            if(qz._key) fbDelete('quizzes/'+qz._key);
+            setState({});
+          }},'🗑 Hapus'));
+          qc.appendChild(qca);
+        }
+        grid.appendChild(qc);
+      });
+      catContent.appendChild(grid);
     }
-    grid.appendChild(qc);
-  });
-  wrap.appendChild(grid);
+
+    allCats.forEach(cat => {
+      const tab = el('button',{class:'quiz-cat-tab'+(cat===activeCat?' active':''), onClick:()=>{
+        activeCat = cat;
+        allCats.forEach(c=>tabEls[c]&&tabEls[c].classList.remove('active'));
+        tab.classList.add('active');
+        renderCatContent();
+      }}, `${cat} (${cats[cat].length})`);
+      tabEls[cat] = tab;
+      tabsWrap.appendChild(tab);
+    });
+    wrap.appendChild(tabsWrap);
+
+    const catContent = el('div',{});
+    renderCatContent();
+    wrap.appendChild(catContent);
+  }
 
   function showQuizForm(){
     let form={title:'',category:'',questions:[]};
