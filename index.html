@@ -697,6 +697,27 @@ function renderModul() {
       mc.appendChild(mcTop);
       if(isAdmin){
         const mca = el('div',{class:'card-actions'});
+        mca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:()=>{
+          let editTitle = m.title, editContent = m.content;
+          const editorEl2 = createEditor('Isi konten materi...', v => editContent = v);
+          const m2 = modal([
+            el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Edit Materi'),
+            (() => { const i = el('input',{type:'text',placeholder:'Judul materi...',style:{marginBottom:'12px'}}); i.value=m.title; i.oninput=e=>editTitle=e.target.value; return i; })(),
+            (() => { editorEl2.style.marginBottom='16px'; editorEl2.setValue(m.content); return editorEl2; })(),
+            el('div',{style:{display:'flex',gap:'10px'}},
+              el('button',{class:'btn-primary',onClick:()=>{
+                if(!editTitle.trim()) return;
+                const updated = {...m, title:editTitle, content:editContent};
+                const materis = state.data.modules[activeModule].subModuls[activeSub].materis;
+                const idx = materis.findIndex(x=>x.id===m.id);
+                if(idx>=0) materis[idx] = updated;
+                saveModules();
+                removeModal(m2); setState({activeMateri: state.activeMateri?.id===m.id ? updated : state.activeMateri});
+              }},'Simpan'),
+              el('button',{class:'btn-secondary',onClick:()=>removeModal(m2)},'Batal')
+            )
+          ], ()=>removeModal(m2));
+        }},'✏️ Edit'));
         mca.appendChild(el('button',{class:'btn-danger',onClick:()=>{
           if(!confirm(`Hapus materi "${m.title}"?`)) return;
           state.data.modules[activeModule].subModuls[activeSub].materis =
@@ -896,6 +917,28 @@ function renderBlog(){
     bc.appendChild(bcTop);
     if(isAdmin){
       const bca = el('div',{class:'card-actions'});
+      bca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:(e)=>{
+        e.stopPropagation();
+        let editForm = {title:p.title, category:p.category, content:p.content};
+        const cats2 = ["Narasi Sukses","Kegiatan Comdev","Mentoring Usaha"];
+        const editorEl = createEditor('Tulis konten artikel...', v => editForm.content = v);
+        const m = modal([
+          el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Edit Artikel'),
+          (() => { const i = el('input',{type:'text',style:{marginBottom:'12px'}}); i.value=p.title; i.oninput=e=>editForm.title=e.target.value; return i; })(),
+          (() => { const s = el('select',{style:{marginBottom:'12px'},onChange:e=>editForm.category=e.target.value}); cats2.forEach(c=>{const o=el('option',{value:c},c); if(c===p.category)o.selected=true; s.appendChild(o);}); return s; })(),
+          (() => { editorEl.style.marginBottom='16px'; editorEl.setValue(p.content); return editorEl; })(),
+          el('div',{style:{display:'flex',gap:'10px'}},
+            el('button',{class:'btn-primary',onClick:()=>{
+              if(!editForm.title.trim()) return;
+              const updated = {...p, ...editForm};
+              state.data.blogs = state.data.blogs.map(b=>b.id===p.id?updated:b);
+              if(p._key) fbSet('blogs/'+p._key, updated);
+              removeModal(m); setState({});
+            }},'Simpan'),
+            el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
+          )
+        ], ()=>removeModal(m));
+      }},'✏️ Edit'));
       bca.appendChild(el('button',{class:'btn-danger',onClick:(e)=>{
         e.stopPropagation();
         if(!confirm(`Hapus artikel "${p.title}"?`)) return;
@@ -1012,10 +1055,14 @@ function renderQuiz(){
     es.appendChild(el('p',{},`Belum ada quiz.${isAdmin?' Buat quiz pertama!':''}`));
     wrap.appendChild(es);
   } else {
-    // Kelompokkan quiz per kategori
+    // Kelompokkan quiz per kategori (normalize: huruf pertama kapital, sisanya kecil)
+    function normCat(c) {
+      if(!c) return 'Umum';
+      return c.trim().charAt(0).toUpperCase() + c.trim().slice(1).toLowerCase();
+    }
     const cats = {};
     quizzes.forEach(qz => {
-      const cat = qz.category || 'Umum';
+      const cat = normCat(qz.category);
       if(!cats[cat]) cats[cat] = [];
       cats[cat].push(qz);
     });
@@ -1039,6 +1086,24 @@ function renderQuiz(){
         qc.appendChild(qcTop);
         if(isAdmin){
           const qca = el('div',{class:'card-actions'});
+          qca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:()=>{
+            let editTitle = qz.title, editCat = qz.category;
+            const m = modal([
+              el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Edit Quiz'),
+              (() => { const i = el('input',{type:'text',placeholder:'Judul quiz...',style:{marginBottom:'12px'}}); i.value=qz.title; i.oninput=e=>editTitle=e.target.value; return i; })(),
+              (() => { const i = el('input',{type:'text',placeholder:'Kategori...',style:{marginBottom:'16px'}}); i.value=qz.category||''; i.oninput=e=>editCat=e.target.value; return i; })(),
+              el('div',{style:{display:'flex',gap:'10px'}},
+                el('button',{class:'btn-primary',onClick:()=>{
+                  if(!editTitle.trim()) return;
+                  const updated = {...qz, title:editTitle, category:editCat};
+                  state.data.quizzes = state.data.quizzes.map(q=>q.id===qz.id?updated:q);
+                  if(qz._key) fbSet('quizzes/'+qz._key, updated);
+                  removeModal(m); setState({});
+                }},'Simpan'),
+                el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
+              )
+            ], ()=>removeModal(m));
+          }},'✏️ Edit'));
           qca.appendChild(el('button',{class:'btn-danger',onClick:()=>{
             if(!confirm(`Hapus quiz "${qz.title}"?`)) return;
             state.data.quizzes = (state.data.quizzes||[]).filter(q=>q.id!==qz.id);
@@ -1176,6 +1241,26 @@ function renderEbook(){
     }
     if(isAdmin){
       const eca = el('div',{class:'card-actions'});
+      eca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:()=>{
+        let ef = {title:eb.title, category:eb.category, description:eb.description, url:eb.url};
+        const m = modal([
+          el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Edit E-Book'),
+          (() => { const i = el('input',{type:'text',placeholder:'Judul...',style:{marginBottom:'12px'}}); i.value=eb.title||''; i.oninput=e=>ef.title=e.target.value; return i; })(),
+          (() => { const i = el('input',{type:'text',placeholder:'Kategori...',style:{marginBottom:'12px'}}); i.value=eb.category||''; i.oninput=e=>ef.category=e.target.value; return i; })(),
+          (() => { const i = el('textarea',{placeholder:'Deskripsi...',rows:'3',style:{marginBottom:'12px',resize:'vertical'}}); i.value=eb.description||''; i.oninput=e=>ef.description=e.target.value; return i; })(),
+          (() => { const i = el('input',{type:'text',placeholder:'Link URL...',style:{marginBottom:'16px'}}); i.value=eb.url||''; i.oninput=e=>ef.url=e.target.value; return i; })(),
+          el('div',{style:{display:'flex',gap:'10px'}},
+            el('button',{class:'btn-primary',onClick:()=>{
+              if(!ef.title.trim()) return;
+              const updated = {...eb, ...ef};
+              state.data.ebooks = state.data.ebooks.map(e=>e.id===eb.id?updated:e);
+              if(eb._key) fbSet('ebooks/'+eb._key, updated);
+              removeModal(m); setState({});
+            }},'Simpan'),
+            el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
+          )
+        ], ()=>removeModal(m));
+      }},'✏️ Edit'));
       eca.appendChild(el('button',{class:'btn-danger',onClick:()=>{
         if(!confirm(`Hapus e-book "${eb.title}"?`)) return;
         state.data.ebooks = (state.data.ebooks||[]).filter(e=>e.id!==eb.id);
