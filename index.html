@@ -227,23 +227,35 @@ const QUOTES = [
 
 // ─── STORAGE ─────────────────────────────────────────────────────────────────
 // ─── GOOGLE SHEETS API ───────────────────────────────────────────────────────
-const API_URL = "https://script.google.com/macros/s/AKfycbwaI3T2F__657k0Zc-WwC3Jsex-aWtzjZeamqn2UxwKSXYrtjEX_pvOq0kQW4f6oU-f/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxTq0PlRNNVpxASBAtBL59-tPhbRSWKWax33mbzgqee8sn0jrXBU3MWDaUzEAhTFQgX/exec";
 async function apiCall(params) {
-  const url = API_URL + '?' + new URLSearchParams(params).toString();
-  try { const r = await fetch(url); return await r.json(); }
-  catch(e) { return {success:false}; }
+  // Pakai GET dengan URLSearchParams — Apps Script hanya support doGet untuk CORS
+  try {
+    const url = API_URL + '?' + new URLSearchParams(params).toString();
+    const r = await fetch(url, {redirect:'follow'});
+    const text = await r.text();
+    return JSON.parse(text);
+  } catch(e) {
+    console.error('API error:', e);
+    return {success:false, error: e.toString()};
+  }
 }
 async function dbGetAll(sheet) {
-  const r = await apiCall({action:'getAll',sheet}); return r.success ? r.data : [];
+  const r = await apiCall({action:'getAll', sheet});
+  return r.success ? r.data : [];
 }
 async function dbAppend(sheet, row) {
-  return apiCall({action:'append',sheet,row:JSON.stringify(row)});
+  // Encode row sebagai JSON string yang aman untuk URL
+  const params = {action:'append', sheet, row: JSON.stringify(row)};
+  return apiCall(params);
 }
 async function dbDelete(sheet, keyCol, keyVal) {
-  return apiCall({action:'deleteRow',sheet,keyCol,keyVal:String(keyVal)});
+  return apiCall({action:'deleteRow', sheet, keyCol, keyVal: String(keyVal)});
 }
 async function dbSetValue(sheet, key, value) {
-  return apiCall({action:'setValue',sheet,key,value});
+  // value bisa sangat panjang (JSON modules), encode dengan benar
+  const params = {action:'setValue', sheet, key, value: String(value)};
+  return apiCall(params);
 }
 
 // ─── LOCAL STORAGE (sesi user) ───────────────────────────────────────────────
@@ -278,9 +290,9 @@ async function initData() {
       dbGetAll('blogs'), dbGetAll('quizzes'), dbGetAll('ebooks'),
       dbGetAll('data'), dbGetAll('forum'), dbGetAll('loginlog'),
     ]);
-    state.data.blogs   = blogs.filter(b=>b.id);
+    state.data.blogs   = blogs.filter(b=>b.id).map(b=>({...b, id:String(b.id)}));
     state.data.quizzes = quizRows.filter(q=>q.id).map(q=>{ try{return JSON.parse(q.data);}catch{return null;} }).filter(Boolean);
-    state.data.ebooks  = ebooks.filter(e=>e.id);
+    state.data.ebooks  = ebooks.filter(e=>e.id).map(e=>({...e, id:String(e.id)}));
     const modRow = modulData.find(r=>r.key==='modules');
     if(modRow && modRow.value) try{ state.data.modules=JSON.parse(modRow.value); }catch{}
     forumRows.forEach(r=>{ if(r.key) try{state.forum[r.key]=JSON.parse(r.data);}catch{} });
@@ -290,7 +302,8 @@ async function initData() {
   state.loading = false; render();
 }
 async function saveModules() {
-  await dbSetValue('data','modules',JSON.stringify(state.data.modules));
+  const r = await dbSetValue('data','modules',JSON.stringify(state.data.modules));
+  console.log('Modules saved:', r);
 }
 async function recordLogin(user) {
   const waktu = new Date().toLocaleString('id-ID');
@@ -810,11 +823,13 @@ function renderBlog(){
       el('div',{style:{display:'flex',gap:'10px'}},
         el('button',{class:'btn-primary',onClick:()=>{
           if(!form.title.trim()||!form.content.trim())return;
-          const post={id:Date.now(),...form,date:new Date().toLocaleDateString('id-ID')};
+          const post={id:String(Date.now()),...form,date:new Date().toLocaleDateString('id-ID')};
           state.data.blogs = [post, ...(state.data.blogs||[])];
           removeModal(m);
-          dbAppend('blogs', post);
           setState({});
+          dbAppend('blogs', post).then(r=>{
+            console.log('Blog saved:', r);
+          });
         }},'Publikasikan'),
         el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
       )
@@ -972,8 +987,10 @@ function renderQuiz(){
             const quiz={id:Date.now(),...form,date:new Date().toLocaleDateString('id-ID')};
             state.data.quizzes = [...(state.data.quizzes||[]), quiz];
             removeModal(m);
-            dbAppend('quizzes',{id:quiz.id, data:JSON.stringify(quiz), date:quiz.date});
             setState({});
+            dbAppend('quizzes',{id:String(quiz.id), data:JSON.stringify(quiz), date:quiz.date}).then(r=>{
+              console.log('Quiz saved:', r);
+            });
           }},'Simpan Quiz'),
           el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
         ));
@@ -1052,7 +1069,7 @@ function renderEbook(){
       el('div',{style:{display:'flex',gap:'10px'}},
         el('button',{class:'btn-primary',onClick:()=>{
           if(!form.title.trim())return;
-          const ebook={id:Date.now(),...form,date:new Date().toLocaleDateString('id-ID')};
+          const ebook={id:String(Date.now()),...form,date:new Date().toLocaleDateString('id-ID')};
           state.data.ebooks = [...(state.data.ebooks||[]), ebook];
           removeModal(m);
           dbAppend('ebooks', ebook);
