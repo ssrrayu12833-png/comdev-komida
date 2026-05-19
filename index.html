@@ -409,6 +409,10 @@ async function recordLogin(user) {
 function setState(patch) {
   Object.assign(state, patch);
   if ('user' in patch) save('comdev_user', state.user);
+  // Push history untuk back button mobile
+  if('page' in patch || 'modulView' in patch || 'blogView' in patch || 'quizView' in patch) {
+    history.pushState({}, '');
+  }
   render();
 }
 
@@ -661,7 +665,14 @@ function renderModul() {
 
   // ── MATERI LIST ──
   if(modulView==='materi' && activeModule && activeSub){
-    const materis = ((allModules[activeModule]||{}).subModuls||{})[activeSub]?.materis||[];
+    const allMateris = ((allModules[activeModule]||{}).subModuls||{})[activeSub]?.materis||[];
+    const userRole = state.user?.role || '';
+    const materis = allMateris.filter(m => {
+      const vis = m.visibilitas || 'semua';
+      if(vis === 'semua') return true;
+      if(isAdmin) return true; // admin lihat semua
+      return vis === userRole;
+    });
     const wrap = el('div',{class:'page-pad-narrow fade-in'});
 
     const bc = el('div',{class:'breadcrumb'});
@@ -691,8 +702,14 @@ function renderModul() {
       const mc = el('div',{class:'card materi-card'});
       const mcTop = el('div',{style:{cursor:'pointer'},onClick:()=>setState({activeMateri:m,modulView:'materiDetail'})});
       mcTop.appendChild(el('div',{class:'materi-title'},m.title));
+      if(isAdmin && m.visibilitas && m.visibilitas !== 'semua') {
+        mcTop.appendChild(el('span',{class:'tag',style:{marginBottom:'4px',display:'inline-block',background:'var(--yellow2)',color:'var(--yellow5)'}},
+          m.visibilitas === 'anggota komida' ? '👤 Anggota' : '🏢 Staf'
+        ));
+      }
       mcTop.appendChild(el('div',{class:'materi-date'},`📅 ${m.date}`));
-      mcTop.appendChild(el('div',{class:'materi-excerpt'},m.content?m.content.slice(0,140)+(m.content.length>140?'...':''):'Belum ada konten'));
+      const excerptText = m.content ? m.content.replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim() : '';
+      mcTop.appendChild(el('div',{class:'materi-excerpt'},excerptText?excerptText.slice(0,140)+(excerptText.length>140?'...':''):'Belum ada konten'));
       mcTop.appendChild(el('div',{class:'read-more'},'Baca selengkapnya →'));
       mc.appendChild(mcTop);
       if(isAdmin){
@@ -722,8 +739,8 @@ function renderModul() {
           if(!confirm(`Hapus materi "${m.title}"?`)) return;
           state.data.modules[activeModule].subModuls[activeSub].materis =
             state.data.modules[activeModule].subModuls[activeSub].materis.filter(x=>x.id!==m.id);
-          saveModules();
           setState({});
+          saveModules();
         }},'🗑 Hapus'));
         mc.appendChild(mca);
       }
@@ -732,25 +749,33 @@ function renderModul() {
     wrap.appendChild(list);
 
     function showAddMateriModal(){
-      let title='',content='';
+      let title='',content='',visibilitas='semua';
       const m = modal([
         el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Tambah Materi'),
         el('input',{type:'text',placeholder:'Judul materi...',style:{marginBottom:'12px'},onInput:e=>title=e.target.value}),
+        (() => {
+          const s = el('select',{style:{marginBottom:'12px'}, onChange:e=>visibilitas=e.target.value});
+          ['semua','anggota komida','staf komida'].forEach(v=>{
+            const o=el('option',{value:v},v==='semua'?'Semua (Anggota & Staf)':v==='anggota komida'?'Anggota KOMIDA saja':'Staf KOMIDA saja');
+            s.appendChild(o);
+          });
+          return s;
+        })(),
         (() => {
           const ed = createEditor('Isi konten materi...', v => content = v);
           ed.style.marginBottom = '16px';
           return ed;
         })(),
         el('div',{style:{display:'flex',gap:'10px'}},
-          el('button',{class:'btn-primary',onClick:()=>{
+          el('button',{class:'btn-primary',onClick:async()=>{
             if(!title.trim())return;
-            const newM={id:Date.now(),title,content,date:new Date().toLocaleDateString('id-ID')};
+            const newM={id:Date.now(),title,content,visibilitas,date:new Date().toLocaleDateString('id-ID')};
             if(!state.data.modules[activeModule]) state.data.modules[activeModule]={subModuls:{}};
             if(!state.data.modules[activeModule].subModuls[activeSub]) state.data.modules[activeModule].subModuls[activeSub]={materis:[]};
             state.data.modules[activeModule].subModuls[activeSub].materis.push(newM);
             removeModal(m);
-            saveModules();
             setState({});
+            await saveModules();
           }},'Simpan'),
           el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
         )
@@ -796,8 +821,8 @@ function renderModul() {
         sca.appendChild(el('button',{class:'btn-danger',onClick:()=>{
           if(!confirm(`Hapus sub modul "${name}" beserta semua materinya?`)) return;
           delete state.data.modules[activeModule].subModuls[name];
-          saveModules();
           setState({});
+          saveModules();
         }},'🗑 Hapus'));
         sc.appendChild(sca);
       }
@@ -817,8 +842,8 @@ function renderModul() {
             if(!state.data.modules[activeModule]) state.data.modules[activeModule]={subModuls:{}};
             state.data.modules[activeModule].subModuls[subName]={materis:[]};
             removeModal(m);
-            saveModules();
             setState({});
+            await saveModules();
           }},'Tambah'),
           el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
         )
@@ -855,12 +880,12 @@ function renderModul() {
       el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Tambah Modul Baru'),
       el('input',{type:'text',placeholder:'Nama modul...',style:{marginBottom:'16px'},onInput:e=>mName=e.target.value}),
       el('div',{style:{display:'flex',gap:'10px'}},
-        el('button',{class:'btn-primary',onClick:()=>{
+        el('button',{class:'btn-primary',onClick:async()=>{
           if(!mName.trim())return;
           state.data.modules[mName]={subModuls:{}};
           removeModal(m);
-          saveModules();
           setState({});
+          await saveModules();
         }},'Tambah'),
         el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
       )
@@ -912,7 +937,8 @@ function renderBlog(){
     bcTop.appendChild(el('span',{class:'tag',style:{marginBottom:'10px',display:'inline-block'}},p.category));
     bcTop.appendChild(el('div',{class:'blog-title'},p.title));
     bcTop.appendChild(el('div',{class:'blog-date'},`📅 ${p.date}`));
-    bcTop.appendChild(el('div',{class:'blog-excerpt'},p.content.slice(0,120)+'...'));
+    const blogExcerpt = (p.content||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim();
+    bcTop.appendChild(el('div',{class:'blog-excerpt'},blogExcerpt.slice(0,120)+(blogExcerpt.length>120?'...':'')));
     bcTop.appendChild(el('div',{class:'read-more'},'Baca selengkapnya →'));
     bc.appendChild(bcTop);
     if(isAdmin){
@@ -1537,6 +1563,19 @@ function render(){
 }
 
 initData();
+
+// ─── BACK BUTTON SUPPORT (mobile) ────────────────────────────────────────────
+window.addEventListener('popstate', () => {
+  if(state.modulView === 'materiDetail') setState({modulView:'materi'});
+  else if(state.modulView === 'materi') setState({modulView:'submodul'});
+  else if(state.modulView === 'submodul') setState({modulView:'list'});
+  else if(state.blogView === 'detail') setState({blogView:'list'});
+  else if(state.quizView === 'take') setState({quizView:'list', quizSubmitted:false, quizAnswers:{}, quizScore:null});
+  else if(state.page !== 'beranda') setState({page:'beranda'});
+});
+
+// Push state saat navigasi supaya back button bisa dideteksi
+const _setState = setState;
 </script>
 </body>
 </html>
