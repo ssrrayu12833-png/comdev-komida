@@ -1779,14 +1779,14 @@ function renderRuangAman() {
       cc.appendChild(topRow);
 
       if(entry.cerita) {
-        cc.appendChild(el('div',{class:'cerita-text'},\`"${entry.cerita}"\`));
+        cc.appendChild(el('div',{class:'cerita-text'},`"${entry.cerita}"`));
       }
 
       // Balasan dari admin
       if(entry.balasan && entry.balasan.length > 0) {
         entry.balasan.forEach(b => {
           const bal = el('div',{class:'cerita-balasan'});
-          bal.innerHTML = \`<strong style="color:var(--green5)">🌿 Tim KOMIDA: </strong>\${b.teks}\`;
+          bal.innerHTML = `<strong style='color:var(--green5)'>🌿 Tim KOMIDA: </strong>${b.teks}`;
           cc.appendChild(bal);
         });
       }
@@ -1800,7 +1800,7 @@ function renderRuangAman() {
         const rb = el('button',{class:'btn-primary',style:{padding:'8px 14px',fontSize:'12px'},onClick:async()=>{
           if(!ri.value.trim()) return;
           const balasan = [...(entry.balasan||[]), {teks:ri.value.trim(), waktu:new Date().toLocaleString('id-ID')}];
-          await fbSet(\`ruangaman/\${entry._key}/balasan\`, balasan);
+          await fbSet(`ruangaman/${entry._key}/balasan`, balasan);
           ri.value=''; replyForm.style.display='none';
           await loadRuangAman();
         }},'Kirim');
