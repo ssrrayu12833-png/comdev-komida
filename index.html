@@ -246,6 +246,9 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 .mood-stat-count{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--green5);}
 .mood-stat-label{font-size:10px;color:var(--text3);}
 @media(max-width:480px){.mood-grid{grid-template-columns:repeat(5,1fr);gap:6px;}.mood-btn{padding:10px 4px;}.mood-emoji{font-size:24px;}}
+
+.nik-wrap{margin-bottom:14px;display:none;}
+.nik-format{font-size:11px;color:var(--text3);margin-top:4px;}
 </style>
 </head>
 <body>
@@ -414,6 +417,11 @@ async function initData() {
     state.data.quizzes = quizzes ? Object.entries(quizzes).map(([k,v])=>({...v,_key:k})) : [];
     state.data.ebooks  = ebooks  ? Object.entries(ebooks).map(([k,v])=>({...v,_key:k}))  : [];
     state.data.modules = modules || {};
+    // Inisialisasi modul default ke Firebase jika belum ada sama sekali
+    if(!modules) {
+      MODULES.forEach(m=>{ state.data.modules[m]={subModuls:{}}; });
+      saveModules();
+    }
     state.forum        = forum   || {};
     const logArr = loginlog ? Object.values(loginlog) : [];
     state.loginLog = logArr;
@@ -520,6 +528,7 @@ function renderSidebar() {
   usr.appendChild(el('div',{class:'login-as'},'Masuk sebagai'));
   usr.appendChild(el('div',{class:'uname'},user.name));
   usr.appendChild(el('div',{class:'urole'},user.role));
+  if(user.nik) usr.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'2px'}},`NIK: ${user.nik}`));
   usr.appendChild(el('button',{onClick:()=>setState({user:null,page:'beranda'})},'Keluar →'));
   s.appendChild(usr);
   return s;
@@ -902,7 +911,10 @@ function renderModul() {
   if(isAdmin) hdr.appendChild(el('button',{class:'btn-secondary',onClick:showAddModuleModal},'+ Modul Baru'));
   wrap.appendChild(hdr);
 
-  const modList = [...MODULES, ...Object.keys(allModules).filter(k=>!MODULES.includes(k))];
+  // Gabungkan: modul default yang belum ada di Firebase + modul dari Firebase
+  const fbModKeys = Object.keys(allModules);
+  const defaultNotInFb = MODULES.filter(m=>!fbModKeys.includes(m));
+  const modList = [...fbModKeys, ...defaultNotInFb];
   const grid = el('div',{class:'module-grid'});
   modList.forEach(mod=>{
     const subs = Object.keys(((allModules[mod]||{}).subModuls)||{});
@@ -1585,6 +1597,22 @@ function renderLanding(){
   const passInput = el('input',{type:'password',placeholder:'Masukkan password...'});
   passWrap.appendChild(passInput);
 
+  // NIK field untuk staf
+  const nikWrap = el('div',{class:'nik-wrap'});
+  nikWrap.appendChild(el('label',{class:'form-label'},'NIK Karyawan'));
+  const nikInput = el('input',{type:'text',placeholder:'000000/0000',maxlength:'11'});
+  // Auto-format NIK: tambah / setelah 6 digit
+  nikInput.addEventListener('input', e => {
+    let val = e.target.value.replace(/[^0-9/]/g,'');
+    // Auto insert /
+    if(val.length === 6 && !val.includes('/')) val = val + '/';
+    if(val.length > 11) val = val.slice(0,11);
+    nikInput.value = val;
+  });
+  nikWrap.appendChild(nikInput);
+  nikWrap.appendChild(el('div',{class:'nik-format'},'Format: 000000/0000 (6 digit / 4 digit tahun)'));
+  nikWrap.appendChild(el('div',{class:'nik-format',style:{color:'var(--green5)',marginTop:'2px'}},'Contoh: 008286/2020'));
+
   roles.forEach(r=>{
     const lbl = el('label',{class:'role-option'});
     const radio = document.createElement('input'); radio.type='radio'; radio.name='role'; radio.value=r;
@@ -1593,6 +1621,8 @@ function renderLanding(){
       selectedRole=r; errorBox.style.display='none';
       roleOptions.forEach(o=>{o.el.classList.toggle('selected',o.r===r);});
       passWrap.style.display=(r==='comdev komida')?'block':'none';
+      nikWrap.style.display=(r==='staf komida')?'block':'none';
+      if(r!=='staf komida') nikInput.value='';
     };
     lbl.appendChild(radio);
     lbl.appendChild(el('span',{},r));
@@ -1601,6 +1631,7 @@ function renderLanding(){
   });
   rbox.appendChild(roleWrap);
   rbox.appendChild(passWrap);
+  rbox.appendChild(nikWrap);
 
   const errorBox = el('div',{class:'error-box',style:{display:'none'}});
   rbox.appendChild(errorBox);
@@ -1615,7 +1646,15 @@ function renderLanding(){
     if(!selectedRole){errorBox.textContent='Pilih kategori pengguna';errorBox.style.display='block';return;}
     if(selectedRole==='comdev komida'&&passInput.value!=='perempuanberdaya'){
       errorBox.textContent='Password salah. Coba lagi.';errorBox.style.display='block';return;}
-    const newUser = {name, role: selectedRole};
+    // Validasi NIK untuk staf
+    if(selectedRole==='staf komida'){
+      const nik = nikInput.value.trim();
+      const nikValid = /^\d{6}\/\d{4}$/.test(nik);
+      if(!nik){errorBox.textContent='Masukkan NIK karyawan terlebih dahulu.';errorBox.style.display='block';return;}
+      if(!nikValid){errorBox.textContent='Format NIK tidak valid. Gunakan format: 000000/0000';errorBox.style.display='block';return;}
+    }
+    const nik = selectedRole==='staf komida' ? nikInput.value.trim() : null;
+    const newUser = {name, role: selectedRole, nik};
     setState({user: newUser, page:'beranda'});
     recordLogin(newUser); // async, tidak perlu await
   }
@@ -1759,9 +1798,6 @@ function renderRuangAman() {
 
     // Daftar cerita
     const ceritaListCard = el('div',{class:'card'});
-    const headerRow = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}});
-    headerRow.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)'}},'💬 Suara-suara dari Tim'));
-    ceritaListCard.appendChild(headerRow);
 
     const hasCerita = entries.filter(e=>e.cerita).length > 0;
     if(!hasCerita && entries.length === 0) {
