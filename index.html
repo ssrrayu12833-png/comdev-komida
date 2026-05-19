@@ -767,7 +767,7 @@ function renderModul() {
           return ed;
         })(),
         el('div',{style:{display:'flex',gap:'10px'}},
-          el('button',{class:'btn-primary',onClick:async()=>{
+          el('button',{class:'btn-primary',onClick:()=>{
             if(!title.trim())return;
             const newM={id:Date.now(),title,content,visibilitas,date:new Date().toLocaleDateString('id-ID')};
             if(!state.data.modules[activeModule]) state.data.modules[activeModule]={subModuls:{}};
@@ -775,7 +775,7 @@ function renderModul() {
             state.data.modules[activeModule].subModuls[activeSub].materis.push(newM);
             removeModal(m);
             setState({});
-            await saveModules();
+            saveModules();
           }},'Simpan'),
           el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
         )
@@ -843,7 +843,7 @@ function renderModul() {
             state.data.modules[activeModule].subModuls[subName]={materis:[]};
             removeModal(m);
             setState({});
-            await saveModules();
+            saveModules();
           }},'Tambah'),
           el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
         )
@@ -880,12 +880,12 @@ function renderModul() {
       el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Tambah Modul Baru'),
       el('input',{type:'text',placeholder:'Nama modul...',style:{marginBottom:'16px'},onInput:e=>mName=e.target.value}),
       el('div',{style:{display:'flex',gap:'10px'}},
-        el('button',{class:'btn-primary',onClick:async()=>{
+        el('button',{class:'btn-primary',onClick:()=>{
           if(!mName.trim())return;
           state.data.modules[mName]={subModuls:{}};
           removeModal(m);
           setState({});
-          await saveModules();
+          saveModules();
         }},'Tambah'),
         el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
       )
