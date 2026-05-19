@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Comdev KOMIDA</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMzAiIGZpbGw9IiNmMGY3ZjAiIHN0cm9rZT0iIzZhYjM2YSIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPGVsbGlwc2UgY3g9IjMyIiBjeT0iMjgiIHJ4PSIxMiIgcnk9IjE0IiBmaWxsPSIjNmFiMzZhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgPGVsbGlwc2UgY3g9IjIyIiBjeT0iMzQiIHJ4PSI5IiByeT0iMTEiIGZpbGw9IiNhOGQ1YTgiIG9wYWNpdHk9IjAuOCIvPgogIDxlbGxpcHNlIGN4PSI0MiIgY3k9IjM0IiByeD0iOSIgcnk9IjExIiBmaWxsPSIjYThkNWE4IiBvcGFjaXR5PSIwLjgiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjQwIiByPSI3IiBmaWxsPSIjZjllY2EwIiBzdHJva2U9IiNjOGE4MDAiIHN0cm9rZS13aWR0aD0iMSIvPgogIDx0ZXh0IHg9IjMyIiB5PSI0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSI4IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzNkOGIzZCIgZm9udC1mYW1pbHk9InNlcmlmIj5LPC90ZXh0Pgo8L3N2Zz4=" type="image/svg+xml"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
 <style>
@@ -221,6 +222,30 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 .materi-rendered-content ul{padding-left:20px;margin:8px 0;}
 .materi-rendered-content ol{padding-left:20px;margin:8px 0;}
 .materi-rendered-content h3{font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--green5);margin:12px 0 6px;}
+
+.blog-cover-img{width:100%;height:180px;object-fit:cover;border-radius:10px;margin-bottom:12px;}
+.blog-cover-img-detail{width:100%;max-height:360px;object-fit:cover;border-radius:12px;margin-bottom:20px;}
+.img-hint{font-size:11px;color:var(--text3);margin-top:4px;margin-bottom:12px;line-height:1.5;}
+
+/* Ruang Aman */
+.mood-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;}
+.mood-btn{border:2px solid var(--green2);border-radius:16px;padding:16px 8px;cursor:pointer;background:white;transition:all .2s;text-align:center;}
+.mood-btn:hover{transform:translateY(-3px);box-shadow:0 4px 12px rgba(0,0,0,.08);}
+.mood-btn.selected{border-color:var(--green4);background:var(--green1);}
+.mood-emoji{font-size:32px;margin-bottom:6px;}
+.mood-label{font-size:11px;color:var(--text3);line-height:1.3;}
+.cerita-card{border-left:3px solid var(--green3);padding:16px 20px;margin-bottom:12px;background:white;border-radius:0 12px 12px 0;border:1px solid var(--green2);border-left:3px solid var(--green4);}
+.cerita-mood-badge{font-size:20px;margin-bottom:4px;}
+.cerita-waktu{font-size:11px;color:var(--text3);margin-bottom:8px;}
+.cerita-text{font-size:14px;color:var(--text2);line-height:1.8;font-style:italic;}
+.cerita-balasan{background:var(--green1);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:13px;color:var(--text2);}
+.ruang-aman-hero{background:linear-gradient(135deg,#e8f5e9,#fff9e6);border-radius:20px;padding:32px;margin-bottom:28px;text-align:center;}
+.mood-stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px;}
+.mood-stat-item{text-align:center;padding:12px 8px;background:white;border-radius:12px;border:1px solid var(--green2);}
+.mood-stat-emoji{font-size:24px;margin-bottom:4px;}
+.mood-stat-count{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--green5);}
+.mood-stat-label{font-size:10px;color:var(--text3);}
+@media(max-width:480px){.mood-grid{grid-template-columns:repeat(5,1fr);gap:6px;}.mood-btn{padding:10px 4px;}.mood-emoji{font-size:24px;}}
 </style>
 </head>
 <body>
@@ -370,6 +395,7 @@ const state = {
   loading: true,
   modulView: 'list', activeModule: null, activeSub: null, activeMateri: null,
   blogView: 'list', activePost: null,
+  ruangAmanView: 'list', activeCerita: null,
   quizView: 'list', activeQuiz: null, quizAnswers: {}, quizSubmitted: false, quizScore: null,
   forum: {},
   quoteIdx: new Date().getDay() % QUOTES.length,
@@ -391,7 +417,9 @@ async function initData() {
     state.forum        = forum   || {};
     const logArr = loginlog ? Object.values(loginlog) : [];
     state.loginLog = logArr;
-    state.counter  = logArr.length;
+    // Hitung user unik berdasarkan nama
+    const namaUnik = new Set(logArr.map(l=>(l.nama||'').trim().toLowerCase()));
+    state.counter  = namaUnik.size;
   } catch(e) { console.error('Init error:',e); }
   state.loading = false; render();
 }
@@ -400,9 +428,13 @@ async function saveModules() {
 }
 async function recordLogin(user) {
   const waktu = new Date().toLocaleString('id-ID');
+  // Hitung user unik (berdasarkan nama, case-insensitive)
+  const namaLower = user.name.trim().toLowerCase();
+  const sudahAda = state.loginLog.some(l => (l.nama||'').toLowerCase() === namaLower);
+  if(!sudahAda) state.counter++;
+  // Catat semua login ke riwayat
   const entry = {nama:user.name, role:user.role, waktu};
   state.loginLog.push(entry);
-  state.counter = state.loginLog.length;
   fbPush('loginlog', entry);
 }
 
@@ -451,22 +483,30 @@ function renderSidebar() {
   const navItems = [
     {id:'beranda',icon:'🏠',label:'Beranda'},
     {id:'modul',icon:'📖',label:'Modul Literasi'},
-    {id:'blog',icon:'✍️',label:'Blog & Narasi'},
+    {id:'ruangaman',icon:'🤍',label:'Ruang Aman'},
     {id:'quiz',icon:'🧩',label:'Quiz'},
     {id:'ebook',icon:'📚',label:'E-Book'},
     ...(isAdmin?[{id:'admin',icon:'⚙️',label:'Admin Panel'}]:[]),
   ];
   const s = el('div',{id:'sidebar'});
   const logo = el('div',{class:'sidebar-logo'});
-  logo.appendChild(el('div',{class:'label'},'Comdev'));
-  logo.appendChild(el('h2',{},'KOMIDA'));
+  const logoRow = el('div',{style:{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}});
+  const logoImg = document.createElement('img');
+  logoImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMzAiIGZpbGw9IiNmMGY3ZjAiIHN0cm9rZT0iIzZhYjM2YSIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPGVsbGlwc2UgY3g9IjMyIiBjeT0iMjgiIHJ4PSIxMiIgcnk9IjE0IiBmaWxsPSIjNmFiMzZhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgPGVsbGlwc2UgY3g9IjIyIiBjeT0iMzQiIHJ4PSI5IiByeT0iMTEiIGZpbGw9IiNhOGQ1YTgiIG9wYWNpdHk9IjAuOCIvPgogIDxlbGxpcHNlIGN4PSI0MiIgY3k9IjM0IiByeD0iOSIgcnk9IjExIiBmaWxsPSIjYThkNWE4IiBvcGFjaXR5PSIwLjgiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjQwIiByPSI3IiBmaWxsPSIjZjllY2EwIiBzdHJva2U9IiNjOGE4MDAiIHN0cm9rZS13aWR0aD0iMSIvPgogIDx0ZXh0IHg9IjMyIiB5PSI0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSI4IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzNkOGIzZCIgZm9udC1mYW1pbHk9InNlcmlmIj5LPC90ZXh0Pgo8L3N2Zz4=';
+  logoImg.style.cssText = 'width:36px;height:36px;border-radius:50%;';
+  const logoText = el('div',{});
+  logoText.appendChild(el('div',{class:'label'},'Comdev'));
+  logoText.appendChild(el('h2',{},'KOMIDA'));
+  logoRow.appendChild(logoImg);
+  logoRow.appendChild(logoText);
+  logo.appendChild(logoRow);
   logo.appendChild(el('div',{class:'sub'},'Selangkah Lebih Berdampak'));
   s.appendChild(logo);
 
   const nav = el('div',{class:'nav-area'});
   navItems.forEach(n=>{
     const btn = el('button',{class:'nav-btn'+(page===n.id?' active':''), onClick:()=>{
-      setState({page:n.id,modulView:'list',blogView:'list',quizView:'list'});
+      setState({page:n.id,modulView:'list',ruangAmanView:'list',quizView:'list'});
       const sb=document.getElementById('sidebar'); const ov=document.getElementById('sidebar-overlay');
       if(sb) sb.classList.remove('open'); if(ov) ov.classList.remove('open');
     }},
@@ -496,7 +536,7 @@ function toggleSidebar(){
 function renderTopbar() {
   const {page, notifications} = state;
   const isAdmin = state.user && state.user.role==='comdev komida';
-  const labels = {beranda:'🏠 Beranda',modul:'📖 Modul Literasi',blog:'✍️ Blog & Narasi',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel'};
+  const labels = {beranda:'🏠 Beranda',modul:'📖 Modul Literasi',ruangaman:'🤍 Ruang Aman',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel'};
   const bar = el('div',{id:'topbar'});
   const left = el('div',{style:{display:'flex',alignItems:'center',gap:'10px'}});
   left.appendChild(el('button',{id:'hamburger',onClick:toggleSidebar},'☰'));
@@ -866,10 +906,22 @@ function renderModul() {
   const grid = el('div',{class:'module-grid'});
   modList.forEach(mod=>{
     const subs = Object.keys(((allModules[mod]||{}).subModuls)||{});
-    const mc = el('div',{class:'card mod-card',onClick:()=>setState({activeModule:mod,modulView:'submodul'})});
-    mc.appendChild(el('div',{class:'mod-icon'},MODULE_ICONS[mod]||'📂'));
-    mc.appendChild(el('div',{class:'mod-name'},mod));
-    mc.appendChild(el('div',{class:'mod-count'},`${subs.length} sub modul`));
+    const mc = el('div',{class:'card mod-card'});
+    const mcTop = el('div',{style:{cursor:'pointer'},onClick:()=>setState({activeModule:mod,modulView:'submodul'})});
+    mcTop.appendChild(el('div',{class:'mod-icon'},MODULE_ICONS[mod]||'📂'));
+    mcTop.appendChild(el('div',{class:'mod-name'},mod));
+    mcTop.appendChild(el('div',{class:'mod-count'},`${subs.length} sub modul`));
+    mc.appendChild(mcTop);
+    if(isAdmin){
+      const mca2 = el('div',{class:'card-actions'});
+      mca2.appendChild(el('button',{class:'btn-danger',style:{fontSize:'12px'},onClick:()=>{
+        if(!confirm(`Hapus modul "${mod}" beserta semua isinya?`)) return;
+        delete state.data.modules[mod];
+        setState({});
+        saveModules();
+      }},'🗑 Hapus'));
+      mc.appendChild(mca2);
+    }
     grid.appendChild(mc);
   });
   wrap.appendChild(grid);
@@ -905,6 +957,12 @@ function renderBlog(){
     const wrap = el('div',{class:'page-pad fade-in',style:{maxWidth:'700px'}});
     wrap.appendChild(el('button',{class:'back-btn',style:{marginBottom:'24px'},onClick:()=>setState({blogView:'list'})},'← Kembali'));
     const c = el('div',{class:'card'});
+    if(activePost.imageUrl) {
+      const img = document.createElement('img');
+      img.src = activePost.imageUrl; img.className = 'blog-cover-img-detail';
+      img.onerror = ()=>img.style.display='none';
+      c.appendChild(img);
+    }
     c.appendChild(el('span',{class:'tag',style:{marginBottom:'12px',display:'inline-block'}},activePost.category));
     c.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'28px',color:'var(--text1)',marginBottom:'8px',lineHeight:'1.3'}},activePost.title));
     c.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'20px'}},`📅 ${activePost.date}`));
@@ -934,6 +992,12 @@ function renderBlog(){
   posts.forEach(p=>{
     const bc = el('div',{class:'card blog-card'});
     const bcTop = el('div',{onClick:()=>setState({activePost:p,blogView:'detail'}),style:{cursor:'pointer'}});
+    if(p.imageUrl) {
+      const img = document.createElement('img');
+      img.src = p.imageUrl; img.className = 'blog-cover-img';
+      img.onerror = ()=>img.style.display='none';
+      bcTop.appendChild(img);
+    }
     bcTop.appendChild(el('span',{class:'tag',style:{marginBottom:'10px',display:'inline-block'}},p.category));
     bcTop.appendChild(el('div',{class:'blog-title'},p.title));
     bcTop.appendChild(el('div',{class:'blog-date'},`📅 ${p.date}`));
@@ -945,13 +1009,15 @@ function renderBlog(){
       const bca = el('div',{class:'card-actions'});
       bca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:(e)=>{
         e.stopPropagation();
-        let editForm = {title:p.title, category:p.category, content:p.content};
+        let editForm = {title:p.title, category:p.category, content:p.content, imageUrl:p.imageUrl||''};
         const cats2 = ["Narasi Sukses","Kegiatan Comdev","Mentoring Usaha"];
         const editorEl = createEditor('Tulis konten artikel...', v => editForm.content = v);
         const m = modal([
           el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Edit Artikel'),
           (() => { const i = el('input',{type:'text',style:{marginBottom:'12px'}}); i.value=p.title; i.oninput=e=>editForm.title=e.target.value; return i; })(),
           (() => { const s = el('select',{style:{marginBottom:'12px'},onChange:e=>editForm.category=e.target.value}); cats2.forEach(c=>{const o=el('option',{value:c},c); if(c===p.category)o.selected=true; s.appendChild(o);}); return s; })(),
+          (() => { const i = el('input',{type:'text',placeholder:'URL foto...',style:{marginBottom:'4px'}}); i.value=p.imageUrl||''; i.oninput=e=>editForm.imageUrl=e.target.value; return i; })(),
+          el('div',{class:'img-hint'},'💡 URL foto dari imgur.com atau Google Drive'),
           (() => { editorEl.style.marginBottom='16px'; editorEl.setValue(p.content); return editorEl; })(),
           el('div',{style:{display:'flex',gap:'10px'}},
             el('button',{class:'btn-primary',onClick:()=>{
@@ -979,7 +1045,7 @@ function renderBlog(){
   wrap.appendChild(grid);
 
   function showBlogForm(){
-    let form = {title:'',category:'Narasi Sukses',content:''};
+    let form = {title:'',category:'Narasi Sukses',content:'',imageUrl:''};
     const m = modal([
       el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Tulis Post Baru'),
       el('input',{type:'text',placeholder:'Judul artikel...',style:{marginBottom:'12px'},onInput:e=>form.title=e.target.value}),
@@ -987,6 +1053,8 @@ function renderBlog(){
         const s = el('select',{style:{marginBottom:'12px'},onChange:e=>form.category=e.target.value});
         cats.forEach(c=>{const o=el('option',{value:c},c);s.appendChild(o);}); return s;
       })(),
+      el('input',{type:'text',placeholder:'URL foto (opsional) — dari Google Drive, Imgur, dll...',style:{marginBottom:'4px'},onInput:e=>form.imageUrl=e.target.value}),
+      el('div',{class:'img-hint'},'💡 Cara dapat URL foto: upload ke imgur.com → klik kanan foto → "Copy image address"'),
       (() => {
         const ed = createEditor('Tulis konten artikel...', v => form.content = v);
         ed.style.marginBottom = '16px';
@@ -1408,17 +1476,62 @@ function renderAdmin(){
       hr.appendChild(th);
     });
     const tbody = tbl.createTBody();
-    [...log].reverse().forEach((entry, i)=>{
-      const tr = tbody.insertRow();
-      tr.style.borderBottom = '1px solid var(--green1)';
-      // pakai nama/role dari Google Sheets (field: nama, role, waktu)
-      [log.length - i, entry.nama||entry.name||'-', entry.role||'-', entry.waktu||'-'].forEach(val=>{
-        const td = tr.insertCell();
-        td.textContent = val;
-        td.style.cssText = 'padding:8px 10px;color:var(--text2);text-transform:capitalize;';
-      });
+    // Buat ringkasan per nama unik
+    const namaMap = {};
+    log.forEach(l => {
+      const key = (l.nama||'').trim().toLowerCase();
+      if(!namaMap[key]) namaMap[key] = {nama:l.nama||'-', role:l.role||'-', jumlah:0, terakhir:l.waktu||'-'};
+      namaMap[key].jumlah++;
+      namaMap[key].terakhir = l.waktu||'-'; // ambil yang terakhir
     });
-    logCard.appendChild(tbl);
+    const ringkasan = Object.values(namaMap).sort((a,b)=>b.jumlah-a.jumlah);
+
+    // Tab: Ringkasan | Semua Riwayat
+    const tabWrap = el('div',{style:{display:'flex',gap:'8px',marginBottom:'16px'}});
+    let showAll = false;
+    const tabRing = el('button',{class:'quiz-cat-tab active',onClick:()=>{showAll=false;tabRing.className='quiz-cat-tab active';tabAll.className='quiz-cat-tab';renderLog();}}, 'Ringkasan per Nama');
+    const tabAll  = el('button',{class:'quiz-cat-tab',onClick:()=>{showAll=true;tabAll.className='quiz-cat-tab active';tabRing.className='quiz-cat-tab';renderLog();}}, 'Semua Riwayat');
+    tabWrap.appendChild(tabRing); tabWrap.appendChild(tabAll);
+    logCard.appendChild(tabWrap);
+
+    const logTableWrap = document.createElement('div');
+    logCard.appendChild(logTableWrap);
+
+    function renderLog() {
+      logTableWrap.innerHTML = '';
+      const tbl2 = document.createElement('table');
+      tbl2.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px;';
+      const thead2 = tbl2.createTHead();
+      const hr2 = thead2.insertRow();
+      const headers2 = showAll ? ['No','Nama','Role','Waktu'] : ['No','Nama','Role','Jumlah Login','Login Terakhir'];
+      headers2.forEach(h=>{
+        const th=document.createElement('th');
+        th.textContent=h;
+        th.style.cssText='text-align:left;padding:8px 10px;border-bottom:2px solid var(--green2);color:var(--green5);font-weight:500;font-size:12px;';
+        hr2.appendChild(th);
+      });
+      const tbody2 = tbl2.createTBody();
+      if(showAll) {
+        [...log].reverse().forEach((entry,i)=>{
+          const tr=tbody2.insertRow(); tr.style.borderBottom='1px solid var(--green1)';
+          [log.length-i, entry.nama||'-', entry.role||'-', entry.waktu||'-'].forEach(val=>{
+            const td=tr.insertCell(); td.textContent=val;
+            td.style.cssText='padding:8px 10px;color:var(--text2);text-transform:capitalize;';
+          });
+        });
+      } else {
+        ringkasan.forEach((r,i)=>{
+          const tr=tbody2.insertRow(); tr.style.borderBottom='1px solid var(--green1)';
+          [i+1, r.nama, r.role, r.jumlah+'x', r.terakhir].forEach(val=>{
+            const td=tr.insertCell(); td.textContent=val;
+            td.style.cssText='padding:8px 10px;color:var(--text2);text-transform:capitalize;';
+          });
+        });
+      }
+      logTableWrap.appendChild(tbl2);
+    }
+    renderLog();
+
   }
   wrap.appendChild(logCard);
 
@@ -1516,6 +1629,197 @@ function renderLanding(){
   return root;
 }
 
+
+// ─── PAGE: RUANG AMAN ────────────────────────────────────────────────────────
+const MOODS = [
+  {emoji:'😊', label:'Sangat\nBaik',   val:5, color:'#4caf50'},
+  {emoji:'🙂', label:'Baik',            val:4, color:'#8bc34a'},
+  {emoji:'😐', label:'Biasa\nSaja',    val:3, color:'#ffc107'},
+  {emoji:'😔', label:'Kurang\nBaik',   val:2, color:'#ff9800'},
+  {emoji:'😢', label:'Sangat\nBerat',  val:1, color:'#f44336'},
+];
+
+function renderRuangAman() {
+  const isAdmin  = state.user && state.user.role === 'comdev komida';
+  const isStaf   = state.user && state.user.role === 'staf komida';
+  const bolehAkses = isAdmin || isStaf;
+
+  const wrap = el('div', {class:'page-pad fade-in', style:{maxWidth:'760px'}});
+
+  // Hanya staf & admin yang bisa akses
+  if(!bolehAkses) {
+    const es = el('div',{class:'empty-state',style:{padding:'80px 0'}});
+    es.appendChild(el('div',{class:'empty-icon'},'🔒'));
+    es.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'8px'}},'Ruang Khusus Staf'));
+    es.appendChild(el('p',{style:{fontSize:'14px',color:'var(--text3)'}},'Halaman ini hanya dapat diakses oleh Staf dan Admin KOMIDA.'));
+    wrap.appendChild(es);
+    return wrap;
+  }
+
+  // ── HERO ──
+  const hero = el('div',{class:'ruang-aman-hero'});
+  hero.appendChild(el('div',{style:{fontSize:'40px',marginBottom:'12px'}},'🤍'));
+  hero.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'28px',color:'var(--green5)',marginBottom:'8px'}},'Ruang Aman'));
+  hero.appendChild(el('p',{style:{fontSize:'14px',color:'var(--text2)',lineHeight:'1.8',maxWidth:'480px',margin:'0 auto'}},'Ini adalah ruang amanmu. Ceritakan perasaanmu hari ini secara anonim. Tidak ada yang tahu siapa kamu — hanya perasaanmu yang terdengar.'));
+  wrap.appendChild(hero);
+
+  // ── FORM MOOD CHECK-IN ──
+  const formCard = el('div',{class:'card',style:{marginBottom:'24px'}});
+  formCard.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)',marginBottom:'4px'}},'Bagaimana perasaanmu hari ini?'));
+  formCard.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'16px'}},'Pilihanmu tidak terhubung ke namamu.'));
+
+  let selectedMood = null;
+  const moodBtns = {};
+  const moodGrid = el('div',{class:'mood-grid'});
+  MOODS.forEach(m => {
+    const btn = el('div',{class:'mood-btn', onClick:()=>{
+      selectedMood = m;
+      Object.values(moodBtns).forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+    }});
+    btn.appendChild(el('div',{class:'mood-emoji'},m.emoji));
+    const lbl = el('div',{class:'mood-label'}); lbl.textContent = m.label;
+    btn.appendChild(lbl);
+    moodBtns[m.val] = btn;
+    moodGrid.appendChild(btn);
+  });
+  formCard.appendChild(moodGrid);
+
+  // Textarea cerita
+  formCard.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'8px'}},'Mau cerita sesuatu? (opsional, anonim)'));
+  const ceritaInput = el('textarea',{
+    placeholder:'Tulis apa yang kamu rasakan... tidak ada yang tahu ini darimu.',
+    rows:'4',
+    style:{resize:'vertical',marginBottom:'16px',width:'100%',fontFamily:"'DM Sans',sans-serif",fontSize:'14px',border:'1.5px solid var(--green2)',borderRadius:'10px',padding:'10px 14px',outline:'none',color:'var(--text1)'}
+  });
+
+  const kirimBtn = el('button',{class:'btn-primary',style:{width:'100%',padding:'12px'},onClick:async()=>{
+    if(!selectedMood){ alert('Pilih mood dulu ya 🌿'); return; }
+    const entry = {
+      mood: selectedMood.val,
+      emoji: selectedMood.emoji,
+      label: selectedMood.label.replace('\n',' '),
+      cerita: ceritaInput.value.trim(),
+      waktu: new Date().toLocaleString('id-ID'),
+      balasan: []
+    };
+    kirimBtn.textContent = 'Mengirim...';
+    kirimBtn.disabled = true;
+    await fbPush('ruangaman', entry);
+    // Reset form
+    selectedMood = null;
+    Object.values(moodBtns).forEach(b=>b.classList.remove('selected'));
+    ceritaInput.value = '';
+    kirimBtn.textContent = 'Kirim Perasaanku 🤍';
+    kirimBtn.disabled = false;
+    // Reload data
+    await loadRuangAman();
+  }},'Kirim Perasaanku 🤍');
+  formCard.appendChild(ceritaInput);
+  formCard.appendChild(kirimBtn);
+  wrap.appendChild(formCard);
+
+  // ── ADMIN: STATISTIK & SEMUA CERITA ──
+  const ceritaSection = el('div',{});
+
+  async function loadRuangAman() {
+    ceritaSection.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px;">Memuat...</div>';
+    const data = await fbGet('ruangaman');
+    const entries = data ? Object.entries(data).map(([k,v])=>({...v,_key:k})).reverse() : [];
+
+    ceritaSection.innerHTML = '';
+
+    if(isAdmin) {
+      // Statistik mood
+      const statCard = el('div',{class:'card',style:{marginBottom:'20px'}});
+      statCard.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)',marginBottom:'16px'}},'📊 Tren Mood Tim'));
+      const statGrid = el('div',{class:'mood-stat-grid'});
+      MOODS.forEach(m => {
+        const count = entries.filter(e=>e.mood===m.val).length;
+        const si = el('div',{class:'mood-stat-item'});
+        si.appendChild(el('div',{class:'mood-stat-emoji'},m.emoji));
+        si.appendChild(el('div',{class:'mood-stat-count'},String(count)));
+        si.appendChild(el('div',{class:'mood-stat-label'},m.label.replace('\n',' ')));
+        statGrid.appendChild(si);
+      });
+      statCard.appendChild(statGrid);
+      // Mood dominan
+      const total = entries.length;
+      if(total > 0) {
+        const avgMood = entries.reduce((s,e)=>s+(e.mood||3),0)/total;
+        const dominan = MOODS.reduce((a,b)=>
+          entries.filter(e=>e.mood===b.val).length > entries.filter(e=>e.mood===a.val).length ? b : a
+        );
+        const info = el('p',{style:{fontSize:'13px',color:'var(--text2)',marginTop:'12px',textAlign:'center'}});
+        info.innerHTML = `Total check-in: <strong>${total}</strong> · Mood dominan: <strong>${dominan.emoji} ${dominan.label.replace('\n',' ')}</strong>`;
+        statCard.appendChild(info);
+      }
+      ceritaSection.appendChild(statCard);
+    }
+
+    // Daftar cerita
+    const ceritaListCard = el('div',{class:'card'});
+    const headerRow = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}});
+    headerRow.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)'}},'💬 Suara-suara dari Tim'));
+    ceritaListCard.appendChild(headerRow);
+
+    const hasCerita = entries.filter(e=>e.cerita).length > 0;
+    if(!hasCerita && entries.length === 0) {
+      ceritaListCard.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',textAlign:'center',padding:'20px 0'}},'Belum ada yang berbagi. Jadilah yang pertama 🌿'));
+    }
+
+    entries.forEach(entry => {
+      if(!entry.cerita && !isAdmin) return; // user biasa hanya lihat yg ada cerita
+      if(!entry.cerita && !entry.mood) return;
+
+      const cc = el('div',{class:'cerita-card'});
+      const topRow = el('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}});
+      topRow.appendChild(el('span',{style:{fontSize:'22px'}},entry.emoji||'🌿'));
+      topRow.appendChild(el('span',{style:{fontSize:'13px',color:'var(--text3)'}},(entry.label||'')+ ' · ' + (entry.waktu||'')));
+      cc.appendChild(topRow);
+
+      if(entry.cerita) {
+        cc.appendChild(el('div',{class:'cerita-text'},\`"${entry.cerita}"\`));
+      }
+
+      // Balasan dari admin
+      if(entry.balasan && entry.balasan.length > 0) {
+        entry.balasan.forEach(b => {
+          const bal = el('div',{class:'cerita-balasan'});
+          bal.innerHTML = \`<strong style="color:var(--green5)">🌿 Tim KOMIDA: </strong>\${b.teks}\`;
+          cc.appendChild(bal);
+        });
+      }
+
+      // Admin: form balas
+      if(isAdmin && entry.cerita) {
+        const replyWrap = el('div',{style:{marginTop:'10px'}});
+        const replyBtn = el('button',{style:{fontSize:'12px',color:'var(--green5)',background:'none',border:'none',cursor:'pointer'}},'Balas anonim →');
+        const replyForm = el('div',{style:{display:'none',gap:'8px',marginTop:'8px',flexDirection:'row'}});
+        const ri = el('input',{type:'text',placeholder:'Tulis respons hangat...',style:{flex:'1',fontSize:'13px'}});
+        const rb = el('button',{class:'btn-primary',style:{padding:'8px 14px',fontSize:'12px'},onClick:async()=>{
+          if(!ri.value.trim()) return;
+          const balasan = [...(entry.balasan||[]), {teks:ri.value.trim(), waktu:new Date().toLocaleString('id-ID')}];
+          await fbSet(\`ruangaman/\${entry._key}/balasan\`, balasan);
+          ri.value=''; replyForm.style.display='none';
+          await loadRuangAman();
+        }},'Kirim');
+        replyBtn.onclick = ()=>{ replyForm.style.display='flex'; ri.focus(); };
+        replyForm.appendChild(ri); replyForm.appendChild(rb);
+        replyWrap.appendChild(replyBtn); replyWrap.appendChild(replyForm);
+        cc.appendChild(replyWrap);
+      }
+
+      ceritaListCard.appendChild(cc);
+    });
+    ceritaSection.appendChild(ceritaListCard);
+  }
+
+  loadRuangAman();
+  wrap.appendChild(ceritaSection);
+  return wrap;
+}
+
 // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
 function render(){
   const root = document.getElementById('root');
@@ -1550,7 +1854,7 @@ function render(){
   switch(state.page){
     case 'beranda': pageEl=renderBeranda(); break;
     case 'modul':   pageEl=renderModul();  break;
-    case 'blog':    pageEl=renderBlog();   break;
+    case 'ruangaman': pageEl=renderRuangAman(); break;
     case 'quiz':    pageEl=renderQuiz();   break;
     case 'ebook':   pageEl=renderEbook();  break;
     case 'admin':   pageEl=(state.user.role==='comdev komida'?renderAdmin():renderBeranda()); break;
