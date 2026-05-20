@@ -1396,9 +1396,9 @@ function renderEbook(){
   if(isAdmin) hdr.appendChild(el('button',{class:'btn-primary',onClick:showEbookForm},'+ Upload E-Book'));
   wrap.appendChild(hdr);
 
-  wrap.appendChild(el('div',{style:{background:'linear-gradient(135deg,var(--yellow1),var(--green1))',border:'1px solid var(--yellow3)',borderRadius:'16px',padding:'24px 28px',marginBottom:'28px',marginTop:'16px'}},
-    el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--text1)',marginBottom:'8px'}},'📖 Mari Tingkatkan Literasi Kita Bersama'),
-    el('p',{style:{fontSize:'14px',color:'var(--text2)',lineHeight:'1.8'}},'Akses e-book dan sumber bacaan pilihan untuk memperluas pengetahuan seputar pemberdayaan perempuan, kesehatan keluarga, keuangan, dan pengembangan diri. Literasi adalah langkah pertama menuju kehidupan yang lebih baik.')
+  wrap.appendChild(el('div',{style:{background:'linear-gradient(135deg,var(--yellow1),var(--green1))',border:'1px solid var(--yellow3)',borderRadius:'16px',padding:'20px 24px',marginBottom:'20px',marginTop:'12px'}},
+    el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'18px',color:'var(--text1)',marginBottom:'6px'}},'📖 Mari Tingkatkan Literasi Kita Bersama'),
+    el('p',{style:{fontSize:'13px',color:'var(--text2)',lineHeight:'1.7'}},'Akses e-book pilihan untuk memperluas pengetahuan seputar pemberdayaan perempuan, kesehatan keluarga, keuangan, dan pengembangan diri.')
   ));
 
   if(ebooks.length===0){
@@ -1406,18 +1406,97 @@ function renderEbook(){
     es.appendChild(el('div',{class:'empty-icon'},'📚'));
     es.appendChild(el('p',{},`Belum ada e-book.${isAdmin?' Upload e-book pertama!':''}`));
     wrap.appendChild(es);
-  } else {
-  // Search bar ebook
+    showEbookFormIfAdmin();
+    return wrap;
+  }
+
+  // Search bar — cari berdasarkan judul, kategori, DAN deskripsi
   let ebookSearch = '';
-  const ebookSearchBar = createSearchBar('Cari e-book...', q=>{ ebookSearch=q; renderEbookGrid(); });
+  const ebookSearchBar = createSearchBar('Cari judul, kategori, atau kata kunci...', q=>{
+    ebookSearch = q;
+    renderEbookCats();
+  });
   wrap.appendChild(ebookSearchBar);
 
-  const ebookGrid2 = el('div',{class:'ebook-grid'});
-  function renderEbookGrid(){
-    ebookGrid2.innerHTML='';
-    const filtered=ebooks.filter(e=>(e.title||'').toLowerCase().includes(ebookSearch)||(e.category||'').toLowerCase().includes(ebookSearch));
-    if(filtered.length===0){ebookGrid2.appendChild(el('div',{class:'search-no-result'},'E-book tidak ditemukan 🔍'));return;}
-    filtered.forEach(eb=>{
+  // Kelompokkan per kategori
+  function getFiltered() {
+    if(!ebookSearch) return ebooks;
+    return ebooks.filter(e=>
+      (e.title||'').toLowerCase().includes(ebookSearch) ||
+      (e.category||'').toLowerCase().includes(ebookSearch) ||
+      (e.description||'').toLowerCase().includes(ebookSearch)
+    );
+  }
+
+  // Area konten kategori
+  const catsArea = el('div',{});
+  wrap.appendChild(catsArea);
+
+  function renderEbookCats() {
+    catsArea.innerHTML = '';
+    const filtered = getFiltered();
+
+    if(filtered.length === 0) {
+      catsArea.appendChild(el('div',{class:'search-no-result'},'E-book tidak ditemukan 🔍'));
+      return;
+    }
+
+    // Jika ada pencarian → tampilkan flat grid tanpa kategori
+    if(ebookSearch) {
+      const grid = el('div',{class:'ebook-grid'});
+      filtered.forEach(eb => grid.appendChild(makeEbookCard(eb)));
+      catsArea.appendChild(grid);
+      return;
+    }
+
+    // Kelompokkan per kategori
+    const cats = {};
+    filtered.forEach(eb => {
+      const cat = eb.category || 'Lainnya';
+      if(!cats[cat]) cats[cat] = [];
+      cats[cat].push(eb);
+    });
+
+    // Tab kategori
+    const allCats = Object.keys(cats);
+    if(allCats.length > 1) {
+      let activeCat = allCats[0];
+      const tabsWrap = el('div',{class:'quiz-cat-tabs'});
+      const tabEls = {};
+      const gridArea = el('div',{});
+
+      function renderCatGrid() {
+        gridArea.innerHTML = '';
+        const grid = el('div',{class:'ebook-grid'});
+        (cats[activeCat]||[]).forEach(eb => grid.appendChild(makeEbookCard(eb)));
+        gridArea.appendChild(grid);
+      }
+
+      allCats.forEach(cat => {
+        const tab = el('button',{
+          class:'quiz-cat-tab'+(cat===activeCat?' active':''),
+          onClick:()=>{
+            activeCat=cat;
+            Object.values(tabEls).forEach(t=>t.classList.remove('active'));
+            tab.classList.add('active');
+            renderCatGrid();
+          }
+        },`${cat} (${cats[cat].length})`);
+        tabEls[cat] = tab;
+        tabsWrap.appendChild(tab);
+      });
+      catsArea.appendChild(tabsWrap);
+      renderCatGrid();
+      catsArea.appendChild(gridArea);
+    } else {
+      // Hanya 1 kategori — langsung grid
+      const grid = el('div',{class:'ebook-grid'});
+      filtered.forEach(eb => grid.appendChild(makeEbookCard(eb)));
+      catsArea.appendChild(grid);
+    }
+  }
+
+  function makeEbookCard(eb) {
     const ec = el('div',{class:'card ebook-card'});
     ec.appendChild(el('div',{class:'ebook-cover'},'📗'));
     if(eb.category) ec.appendChild(el('span',{class:'tag',style:{marginBottom:'8px',display:'inline-block'}},eb.category));
@@ -1431,61 +1510,60 @@ function renderEbook(){
     if(isAdmin){
       const eca = el('div',{class:'card-actions'});
       eca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:()=>{
-        let ef = {title:eb.title, category:eb.category, description:eb.description, url:eb.url};
-        const m = modal([
+        let ef={title:eb.title,category:eb.category,description:eb.description,url:eb.url};
+        const m=modal([
           el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Edit E-Book'),
-          (() => { const i = el('input',{type:'text',placeholder:'Judul...',style:{marginBottom:'12px'}}); i.value=eb.title||''; i.oninput=e=>ef.title=e.target.value; return i; })(),
-          (() => { const i = el('input',{type:'text',placeholder:'Kategori...',style:{marginBottom:'12px'}}); i.value=eb.category||''; i.oninput=e=>ef.category=e.target.value; return i; })(),
-          (() => { const i = el('textarea',{placeholder:'Deskripsi...',rows:'3',style:{marginBottom:'12px',resize:'vertical'}}); i.value=eb.description||''; i.oninput=e=>ef.description=e.target.value; return i; })(),
-          (() => { const i = el('input',{type:'text',placeholder:'Link URL...',style:{marginBottom:'16px'}}); i.value=eb.url||''; i.oninput=e=>ef.url=e.target.value; return i; })(),
+          (()=>{const i=el('input',{type:'text',placeholder:'Judul...',style:{marginBottom:'12px'}});i.value=eb.title||'';i.oninput=e=>ef.title=e.target.value;return i;})(),
+          (()=>{const i=el('input',{type:'text',placeholder:'Kategori...',style:{marginBottom:'12px'}});i.value=eb.category||'';i.oninput=e=>ef.category=e.target.value;return i;})(),
+          (()=>{const i=el('textarea',{placeholder:'Deskripsi...',rows:'3',style:{marginBottom:'12px',resize:'vertical'}});i.value=eb.description||'';i.oninput=e=>ef.description=e.target.value;return i;})(),
+          (()=>{const i=el('input',{type:'text',placeholder:'Link URL...',style:{marginBottom:'16px'}});i.value=eb.url||'';i.oninput=e=>ef.url=e.target.value;return i;})(),
           el('div',{style:{display:'flex',gap:'10px'}},
             el('button',{class:'btn-primary',onClick:()=>{
-              if(!ef.title.trim()) return;
-              const updated = {...eb, ...ef};
-              state.data.ebooks = state.data.ebooks.map(e=>e.id===eb.id?updated:e);
-              if(eb._key) fbSet('ebooks/'+eb._key, updated);
-              removeModal(m); setState({});
+              if(!ef.title.trim())return;
+              const updated={...eb,...ef};
+              state.data.ebooks=state.data.ebooks.map(e=>e.id===eb.id?updated:e);
+              if(eb._key) fbSet('ebooks/'+eb._key,updated);
+              removeModal(m); renderEbookCats();
             }},'Simpan'),
             el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
           )
-        ], ()=>removeModal(m));
+        ],()=>removeModal(m));
       }},'✏️ Edit'));
       eca.appendChild(el('button',{class:'btn-danger',onClick:()=>{
-        if(!confirm(`Hapus e-book "${eb.title}"?`)) return;
-        state.data.ebooks = (state.data.ebooks||[]).filter(e=>e.id!==eb.id);
+        if(!confirm(`Hapus e-book "${eb.title}"?`))return;
+        state.data.ebooks=(state.data.ebooks||[]).filter(e=>e.id!==eb.id);
         if(eb._key) fbDelete('ebooks/'+eb._key);
         setState({});
       }},'🗑 Hapus'));
-        ec.appendChild(eca);
-      }
-      ebookGrid2.appendChild(ec);
-    });
+      ec.appendChild(eca);
+    }
+    return ec;
   }
-  renderEbookGrid();
-  wrap.appendChild(ebookGrid2);
-  } // end else ebook
 
+  renderEbookCats();
+
+  function showEbookFormIfAdmin(){}
   function showEbookForm(){
     let form={title:'',category:'',description:'',url:''};
-    const m = modal([
+    const m=modal([
       el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Upload E-Book'),
       el('input',{type:'text',placeholder:'Judul e-book...',style:{marginBottom:'12px'},onInput:e=>form.title=e.target.value}),
-      el('input',{type:'text',placeholder:'Kategori...',style:{marginBottom:'12px'},onInput:e=>form.category=e.target.value}),
-      el('textarea',{placeholder:'Deskripsi singkat...',rows:'3',style:{marginBottom:'12px',resize:'vertical'},onInput:e=>form.description=e.target.value}),
-      el('input',{type:'text',placeholder:'Link unduh / Google Drive URL...',style:{marginBottom:'16px'},onInput:e=>form.url=e.target.value}),
-      el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'16px'}},'💡 Upload file ke Google Drive, kemudian salin link berbagi di sini.'),
+      el('input',{type:'text',placeholder:'Kategori (misal: Pengembangan Diri, Keuangan...)',style:{marginBottom:'12px'},onInput:e=>form.category=e.target.value}),
+      el('textarea',{placeholder:'Deskripsi singkat — tulis kata kunci yang mudah dicari...',rows:'3',style:{marginBottom:'12px',resize:'vertical'},onInput:e=>form.description=e.target.value}),
+      el('input',{type:'text',placeholder:'Link Google Drive, YouTube, atau website lain...',style:{marginBottom:'6px'},onInput:e=>form.url=e.target.value}),
+      el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'16px'}},'💡 Bisa link Google Drive, YouTube, atau artikel dari website lain.'),
       el('div',{style:{display:'flex',gap:'10px'}},
         el('button',{class:'btn-primary',onClick:()=>{
           if(!form.title.trim())return;
           const ebook={id:String(Date.now()),...form,date:new Date().toLocaleDateString('id-ID')};
-          state.data.ebooks = [...(state.data.ebooks||[]), ebook];
+          state.data.ebooks=[...(state.data.ebooks||[]),ebook];
           removeModal(m);
           setState({});
-          fbPush('ebooks', ebook);
+          fbPush('ebooks',ebook);
         }},'Simpan'),
         el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
       )
-    ], ()=>removeModal(m));
+    ],()=>removeModal(m));
   }
   return wrap;
 }
