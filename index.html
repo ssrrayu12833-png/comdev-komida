@@ -272,6 +272,21 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
   #topbar{position:sticky;top:0;z-index:100;}
   .floating-wa{bottom:20px;right:16px;width:50px;height:50px;font-size:22px;}
 }
+
+/* Profil */
+.profil-hero{background:linear-gradient(135deg,var(--green1),var(--yellow1));border-radius:20px;padding:32px;margin-bottom:24px;display:flex;align-items:center;gap:24px;}
+.profil-avatar-wrap{position:relative;flex-shrink:0;}
+.profil-avatar{width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 4px 16px rgba(0,0,0,.12);background:var(--green2);display:flex;align-items:center;justify-content:center;font-size:44px;cursor:pointer;}
+.profil-avatar-edit{position:absolute;bottom:0;right:0;width:26px;height:26px;background:var(--green4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;border:2px solid white;}
+.profil-name{font-family:'Cormorant Garamond',serif;font-size:26px;color:var(--text1);margin-bottom:4px;}
+.profil-role{font-size:13px;color:var(--text3);text-transform:capitalize;margin-bottom:4px;}
+.profil-meta{font-size:12px;color:var(--text3);}
+.progress-bar-wrap{background:var(--green1);border-radius:20px;height:8px;overflow:hidden;margin-top:6px;}
+.progress-bar-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--green4),var(--green3));transition:width .4s;}
+.mood-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px;}
+.mood-day{width:100%;aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;border:1px solid var(--green2);}
+.quiz-history-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--green2);}
+@media(max-width:768px){.profil-hero{flex-direction:column;text-align:center;}.profil-avatar{width:80px;height:80px;font-size:38px;}}
 </style>
 </head>
 <body>
@@ -412,7 +427,18 @@ function save(key, val) {
 
 // ─── APP STATE ────────────────────────────────────────────────────────────────
 const state = {
-  user: load('comdev_user', null),
+  user: (()=>{
+    const savedUser = load('comdev_user', null);
+    const loginDate = load('comdev_login_date', null);
+    const today = new Date().toISOString().slice(0,10);
+    // Kalau tanggal login beda dengan hari ini → paksa logout
+    if(savedUser && loginDate !== today) {
+      localStorage.removeItem('comdev_user');
+      localStorage.removeItem('comdev_login_date');
+      return null;
+    }
+    return savedUser;
+  })(),
   page: 'beranda',
   data: {modules:{},blogs:[],quizzes:[],ebooks:[]},
   notifications: [],
@@ -471,7 +497,15 @@ async function recordLogin(user) {
 
 function setState(patch) {
   Object.assign(state, patch);
-  if ('user' in patch) save('comdev_user', state.user);
+  if ('user' in patch) {
+    save('comdev_user', state.user);
+    if(state.user) {
+      // Simpan tanggal login hari ini (format YYYY-MM-DD)
+      save('comdev_login_date', new Date().toISOString().slice(0,10));
+    } else {
+      localStorage.removeItem('comdev_login_date');
+    }
+  }
   // Push history untuk back button mobile
   if('page' in patch || 'modulView' in patch || 'blogView' in patch || 'quizView' in patch) {
     history.pushState({}, '');
@@ -517,6 +551,7 @@ function renderSidebar() {
     {id:'ruangaman',icon:'💚',label:'Daily Mood Check'},
     {id:'quiz',icon:'🧩',label:'Quiz'},
     {id:'ebook',icon:'📚',label:'E-Book'},
+    {id:'profil',icon:'👤',label:'Profil Saya'},
     ...(isAdmin?[{id:'admin',icon:'⚙️',label:'Admin Panel'}]:[]),
   ];
   const s = el('div',{id:'sidebar'});
@@ -569,7 +604,7 @@ function toggleSidebar(){
 function renderTopbar() {
   const {page, notifications} = state;
   const isAdmin = state.user && state.user.role==='comdev komida';
-  const labels = {beranda:'🏠 Beranda',modul:'📖 Modul Literasi',ruangaman:'💚 Daily Mood Check',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel'};
+  const labels = {beranda:'🏠 Beranda',modul:'📖 Modul Literasi',ruangaman:'💚 Daily Mood Check',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel',profil:'👤 Profil Saya'};
   const bar = el('div',{id:'topbar'});
   const left = el('div',{style:{display:'flex',alignItems:'center',gap:'10px'}});
   left.appendChild(el('button',{id:'hamburger',onClick:toggleSidebar},'☰'));
@@ -664,6 +699,14 @@ function renderModul() {
     bc.appendChild(el('span',{class:'bread-sep'},'|'));
     bc.appendChild(el('span',{class:'bread-text'},`${activeModule} › ${activeSub}`));
     wrap.appendChild(bc);
+
+    // Track materi sudah dibaca
+    (()=>{
+      const rKey = 'read_materis_' + ((state.user.nik||state.user.name)||'').replace(/[^a-z0-9]/gi,'_');
+      const rSet = new Set(JSON.parse(localStorage.getItem(rKey)||'[]'));
+      rSet.add(String(activeMateri.id));
+      localStorage.setItem(rKey, JSON.stringify([...rSet]));
+    })();
 
     const mcard = el('div',{class:'card',style:{marginBottom:'24px'}});
     mcard.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'26px',color:'var(--text1)',marginBottom:'8px'}},activeMateri.title));
@@ -1205,7 +1248,13 @@ function renderQuiz(){
       wrap.appendChild(el('button',{class:'btn-primary',style:{marginTop:'8px'},onClick:()=>{
         let correct=0;
         activeQuiz.questions.forEach(q=>{if(state.quizAnswers[q.id]===q.correct)correct++;});
-        setState({quizScore:Math.round((correct/activeQuiz.questions.length)*100),quizSubmitted:true});
+        const finalScore = Math.round((correct/activeQuiz.questions.length)*100);
+        // Simpan ke riwayat quiz
+        const qKey = 'quiz_history_' + ((state.user.nik||state.user.name)||'').replace(/[^a-z0-9]/gi,'_');
+        const qHist = JSON.parse(localStorage.getItem(qKey)||'[]');
+        qHist.push({title:activeQuiz.title, score:finalScore, waktu:new Date().toLocaleString('id-ID')});
+        localStorage.setItem(qKey, JSON.stringify(qHist));
+        setState({quizScore:finalScore,quizSubmitted:true});
       }},'Kumpulkan Jawaban'));
     }
     return wrap;
@@ -2194,6 +2243,241 @@ function renderLanding(){
   return root2;
 }
 
+
+// ─── PAGE: PROFIL ────────────────────────────────────────────────────────────
+const ANIMAL_AVATARS = ['🦊','🐼','🦁','🐨','🦋','🐸','🦜','🐺','🦩','🐙','🦚','🐬','🦔','🦥','🐧','🦘','🦓','🐻','🦛','🦒'];
+
+function getUserAvatar(name) {
+  // Avatar hewan konsisten berdasarkan nama
+  const idx = name.split('').reduce((s,c)=>s+c.charCodeAt(0),0) % ANIMAL_AVATARS.length;
+  return ANIMAL_AVATARS[idx];
+}
+
+function renderProfil() {
+  const {user, data} = state;
+  const isStaf  = user.role === 'staf komida';
+  const isAdmin = user.role === 'comdev komida';
+  const wrap = el('div',{class:'page-pad fade-in',style:{maxWidth:'780px'}});
+
+  // ── Load foto profil dari localStorage ──
+  const photoKey = 'profil_photo_' + (user.nik || user.name).replace(/[^a-z0-9]/gi,'_');
+  let photoUrl = localStorage.getItem(photoKey) || null;
+
+  // ── HERO PROFIL ──
+  const hero = el('div',{class:'profil-hero'});
+
+  // Avatar / foto
+  const avatarWrap = el('div',{class:'profil-avatar-wrap'});
+  const avatarEl = el('div',{class:'profil-avatar'});
+  function renderAvatar() {
+    avatarEl.innerHTML = '';
+    if(photoUrl) {
+      const img = document.createElement('img');
+      img.src = photoUrl;
+      img.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;';
+      img.onerror = ()=>{ photoUrl=null; localStorage.removeItem(photoKey); renderAvatar(); };
+      avatarEl.appendChild(img);
+    } else {
+      avatarEl.textContent = getUserAvatar(user.name);
+    }
+  }
+  renderAvatar();
+
+  // Tombol ganti foto
+  const editBtn = el('div',{class:'profil-avatar-edit',title:'Ganti foto'},'✏️');
+  const fileInput = document.createElement('input');
+  fileInput.type='file'; fileInput.accept='image/*'; fileInput.style.display='none';
+  fileInput.onchange = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    if(file.size > 2*1024*1024) { alert('Ukuran foto maksimal 2MB ya.'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      photoUrl = ev.target.result;
+      localStorage.setItem(photoKey, photoUrl);
+      renderAvatar();
+    };
+    reader.readAsDataURL(file);
+  };
+  editBtn.onclick = ()=>fileInput.click();
+  avatarWrap.appendChild(avatarEl);
+  avatarWrap.appendChild(editBtn);
+  avatarWrap.appendChild(fileInput);
+  hero.appendChild(avatarWrap);
+
+  // Info user
+  const info = el('div',{style:{flex:'1'}});
+  info.appendChild(el('div',{class:'profil-name'},user.name));
+  info.appendChild(el('div',{class:'profil-role'},user.role));
+  if(user.nik)    info.appendChild(el('div',{class:'profil-meta'},'NIK: '+user.nik));
+  if(user.cabang) info.appendChild(el('div',{class:'profil-meta'},'Cabang: '+user.cabang));
+  info.appendChild(el('div',{class:'profil-meta',style:{marginTop:'4px',fontSize:'11px',color:'var(--text3)'}},'Klik foto untuk ganti gambar profil'));
+  hero.appendChild(info);
+  wrap.appendChild(hero);
+
+  // ── PROGRESS MATERI ──
+  const allMods = data.modules || {};
+  const readKey = 'read_materis_' + (user.nik||user.name).replace(/[^a-z0-9]/gi,'_');
+  const readSet = new Set(JSON.parse(localStorage.getItem(readKey)||'[]'));
+
+  // Hitung total materi
+  let totalMateri = 0, totalSub = 0;
+  Object.values(allMods).forEach(mod=>{
+    Object.values(mod.subModuls||{}).forEach(sub=>{
+      const mats = sub.materis||[];
+      totalMateri += mats.length;
+      totalSub++;
+    });
+  });
+
+  const readCount = readSet.size;
+  const pct = totalMateri > 0 ? Math.round(readCount/totalMateri*100) : 0;
+
+  const progCard = el('div',{class:'card',style:{marginBottom:'16px'}});
+  const progHeader = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}});
+  progHeader.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)'}},'📖 Progress Materi'));
+  progHeader.appendChild(el('span',{class:'tag'},`${readCount}/${totalMateri} materi`));
+  progCard.appendChild(progHeader);
+
+  // Bar progress overall
+  const barWrap = el('div',{class:'progress-bar-wrap',style:{marginBottom:'16px'}});
+  const barFill = el('div',{class:'progress-bar-fill',style:{width:'0%'}});
+  barWrap.appendChild(barFill);
+  progCard.appendChild(barWrap);
+  setTimeout(()=>barFill.style.width=pct+'%', 100);
+  progCard.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'16px'}},`${pct}% selesai dari semua materi`));
+
+  // Per modul
+  Object.entries(allMods).forEach(([modName, mod])=>{
+    let modTotal=0, modRead=0;
+    Object.values(mod.subModuls||{}).forEach(sub=>{
+      (sub.materis||[]).forEach(m=>{
+        modTotal++;
+        if(readSet.has(m.id+'')) modRead++;
+      });
+    });
+    if(modTotal===0) return;
+    const modPct = Math.round(modRead/modTotal*100);
+    const modRow = el('div',{style:{marginBottom:'10px'}});
+    const modLabel = el('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'4px'}});
+    modLabel.appendChild(el('span',{style:{fontSize:'13px',color:'var(--text2)'}},modName));
+    modLabel.appendChild(el('span',{style:{fontSize:'12px',color:'var(--text3)'}},`${modRead}/${modTotal}`));
+    modRow.appendChild(modLabel);
+    const mBarWrap = el('div',{class:'progress-bar-wrap'});
+    const mBarFill = el('div',{class:'progress-bar-fill',style:{width:'0%',background:modPct===100?'var(--green4)':'var(--green3)'}});
+    mBarWrap.appendChild(mBarFill);
+    modRow.appendChild(mBarWrap);
+    setTimeout(()=>mBarFill.style.width=modPct+'%', 150);
+    progCard.appendChild(modRow);
+  });
+
+  if(totalMateri===0) progCard.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',textAlign:'center',padding:'12px 0'}},'Belum ada materi yang tersedia.'));
+  wrap.appendChild(progCard);
+
+  // ── RIWAYAT QUIZ ──
+  const quizKey = 'quiz_history_' + (user.nik||user.name).replace(/[^a-z0-9]/gi,'_');
+  const quizHistory = JSON.parse(localStorage.getItem(quizKey)||'[]');
+
+  const quizCard = el('div',{class:'card',style:{marginBottom:'16px'}});
+  const qHeader = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}});
+  qHeader.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)'}},'🧩 Riwayat Quiz'));
+  qHeader.appendChild(el('span',{class:'tag'},quizHistory.length+' quiz'));
+  quizCard.appendChild(qHeader);
+
+  if(quizHistory.length===0){
+    quizCard.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',textAlign:'center',padding:'16px 0'}},'Belum ada quiz yang dikerjakan.'));
+  } else {
+    [...quizHistory].reverse().slice(0,10).forEach(q=>{
+      const row = el('div',{class:'quiz-history-row'});
+      const left2 = el('div');
+      left2.appendChild(el('div',{style:{fontSize:'14px',color:'var(--text1)',marginBottom:'2px'}},q.title));
+      left2.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)'}},q.waktu));
+      row.appendChild(left2);
+      const score = el('div',{style:{textAlign:'right'}});
+      const pctQ = q.score;
+      score.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:pctQ>=70?'var(--green5)':'var(--yellow5)'}},pctQ+''));
+      score.appendChild(el('div',{style:{fontSize:'10px',color:'var(--text3)'}},'nilai'));
+      row.appendChild(score);
+      quizCard.appendChild(row);
+    });
+  }
+  wrap.appendChild(quizCard);
+
+  // ── MOOD HISTORY (khusus staf) ──
+  if(isStaf || isAdmin) {
+    const moodCard = el('div',{class:'card',style:{marginBottom:'16px'}});
+    moodCard.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)',marginBottom:'12px'}},'💚 Mood History (30 Hari)'));
+
+    // Ambil dari Firebase — filter by NIK atau nama
+    (async()=>{
+      const allMood = await fbGet('dailymood');
+      const entries = allMood ? Object.values(allMood) : [];
+      const myMoods = entries.filter(e=>{
+        // Match berdasarkan cabang+waktu (anonim) — tidak bisa by nama
+        // Pakai localStorage untuk mood pribadi
+        return true; // akan difilter dari localStorage
+      });
+
+      // Mood dari localStorage (per perangkat, lebih akurat untuk pribadi)
+      const today = new Date();
+      const calWrap = el('div',{class:'mood-calendar'});
+
+      // Header hari
+      ['Min','Sen','Sel','Rab','Kam','Jum','Sab'].forEach(d=>{
+        calWrap.appendChild(el('div',{style:{fontSize:'10px',color:'var(--text3)',textAlign:'center',paddingBottom:'4px'}},d));
+      });
+
+      // Isi 30 hari
+      const firstDay = new Date(today); firstDay.setDate(today.getDate()-29);
+      const startDow = firstDay.getDay();
+      // Padding awal
+      for(let i=0;i<startDow;i++){
+        calWrap.appendChild(el('div',{}));
+      }
+
+      for(let i=0;i<30;i++){
+        const d = new Date(firstDay); d.setDate(firstDay.getDate()+i);
+        const dStr = d.toISOString().slice(0,10);
+        const moodVal = localStorage.getItem('mood_'+dStr);
+        const moodObj = moodVal ? MOODS.find(m=>m.val===parseInt(moodVal)) : null;
+        const dayDiv = el('div',{class:'mood-day',
+          style:{background:moodObj?
+            (moodObj.val>=4?'#e8f5e9':moodObj.val===3?'#fff9e6':'#fce4ec')
+            :'white',
+          fontSize:'14px'},
+          title:dStr+(moodObj?' — '+moodObj.label:'')
+        }, moodObj?moodObj.emoji:'');
+        calWrap.appendChild(dayDiv);
+      }
+      moodCard.appendChild(calWrap);
+
+      // Summary
+      let goodCount=0, badCount=0, neutralCount=0, totalMoodDays=0;
+      for(let i=0;i<30;i++){
+        const d=new Date(firstDay); d.setDate(firstDay.getDate()+i);
+        const mv=localStorage.getItem('mood_'+d.toISOString().slice(0,10));
+        if(mv){ totalMoodDays++; const v=parseInt(mv); if(v>=4)goodCount++;else if(v<=2)badCount++;else neutralCount++; }
+      }
+      if(totalMoodDays>0){
+        const summ = el('div',{style:{display:'flex',gap:'12px',marginTop:'14px',justifyContent:'center',flexWrap:'wrap'}});
+        [{label:'Baik',count:goodCount,color:'var(--green5)'},{label:'Netral',count:neutralCount,color:'var(--yellow5)'},{label:'Berat',count:badCount,color:'#e74c3c'}]
+          .forEach(s=>{
+            const sd=el('div',{style:{textAlign:'center'}});
+            sd.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:s.color}},String(s.count)));
+            sd.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)'}},s.label+' hari'));
+            summ.appendChild(sd);
+          });
+        moodCard.appendChild(summ);
+      } else {
+        moodCard.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',textAlign:'center',marginTop:'12px'}},'Belum ada data mood. Mulai check-in dari Daily Mood Check! 💚'));
+      }
+    })();
+    wrap.appendChild(moodCard);
+  }
+
+  return wrap;
+}
+
 // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
 // ─── SEARCH BAR HELPER ───────────────────────────────────────────────────────
 function createSearchBar(placeholder, onSearch) {
@@ -2241,6 +2525,7 @@ function render(){
     case 'ruangaman': pageEl=renderRuangAman(); break;
     case 'quiz':    pageEl=renderQuiz();   break;
     case 'ebook':   pageEl=renderEbook();  break;
+    case 'profil':  pageEl=renderProfil(); break;
     case 'admin':   pageEl=(state.user.role==='comdev komida'?renderAdmin():renderBeranda()); break;
     default:        pageEl=renderBeranda();
   }
