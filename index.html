@@ -129,10 +129,15 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 .quiz-card{cursor:pointer;transition:all .2s;}
 .quiz-card:hover{border-color:var(--green3)!important;transform:translateY(-2px);}
 /* Ebook */
-.ebook-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-.ebook-card{transition:all .2s;}
-.ebook-card:hover{border-color:var(--green3)!important;transform:translateY(-2px);}
-.ebook-cover{width:48px;height:60px;background:linear-gradient(135deg,var(--green3),var(--green4));border-radius:6px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.ebook-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+.ebook-card{transition:all .2s;cursor:pointer;}
+.ebook-card:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,.08);}
+.ebook-cover{width:100%;height:120px;border-radius:10px;margin-bottom:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:28px;position:relative;overflow:hidden;}
+.ebook-cover-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.25);color:white;font-size:9px;text-align:center;padding:3px 4px;font-weight:500;letter-spacing:.3px;text-transform:uppercase;}
+.ebook-title-small{font-size:12px;color:var(--text1);font-weight:500;line-height:1.4;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.ebook-desc-small{font-size:11px;color:var(--text3);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+@media(max-width:768px){.ebook-grid{grid-template-columns:repeat(3,1fr);gap:10px;}}
+@media(max-width:480px){.ebook-grid{grid-template-columns:repeat(2,1fr);gap:8px;}}
 .ebook-title{font-family:'Cormorant Garamond',serif;font-size:16px;color:var(--text1);margin-bottom:6px;line-height:1.3;}
 /* Admin */
 .admin-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
@@ -1382,6 +1387,31 @@ function renderQuiz(){
 }
 
 // ─── PAGE: EBOOK ─────────────────────────────────────────────────────────────
+
+// Warna cover e-book per kategori
+const EBOOK_CAT_COLORS = {
+  'pengembangan diri': {bg:'linear-gradient(135deg,#667eea,#764ba2)',emoji:'✨'},
+  'leadership':        {bg:'linear-gradient(135deg,#f093fb,#f5576c)',emoji:'🏆'},
+  'keuangan':          {bg:'linear-gradient(135deg,#4facfe,#00f2fe)',emoji:'💰'},
+  'kesehatan':         {bg:'linear-gradient(135deg,#43e97b,#38f9d7)',emoji:'💚'},
+  'parenting':         {bg:'linear-gradient(135deg,#fa709a,#fee140)',emoji:'👶'},
+  'inspirasi':         {bg:'linear-gradient(135deg,#f6d365,#fda085)',emoji:'🌟'},
+  'novel':             {bg:'linear-gradient(135deg,#a18cd1,#fbc2eb)',emoji:'📖'},
+  'religi':            {bg:'linear-gradient(135deg,#84fab0,#8fd3f4)',emoji:'🕌'},
+  'sejarah':           {bg:'linear-gradient(135deg,#d4a574,#c9775a)',emoji:'🏛️'},
+  'tips & trik':       {bg:'linear-gradient(135deg,#ffecd2,#fcb69f)',emoji:'💡'},
+  'motivasi':          {bg:'linear-gradient(135deg,#a1c4fd,#c2e9fb)',emoji:'🚀'},
+  'wirausaha':         {bg:'linear-gradient(135deg,#96fbc4,#f9f586)',emoji:'💼'},
+  'filsafat':          {bg:'linear-gradient(135deg,#6a3093,#a044ff)',emoji:'🧠'},
+  'puisi':             {bg:'linear-gradient(135deg,#f8b500,#ff6b6b)',emoji:'🌸'},
+  'cerpen':            {bg:'linear-gradient(135deg,#11998e,#38ef7d)',emoji:'📝'},
+  'marketing':         {bg:'linear-gradient(135deg,#fc5c7d,#6a82fb)',emoji:'📈'},
+  'default':           {bg:'linear-gradient(135deg,var(--green3),var(--green4))',emoji:'📚'},
+};
+function getEbookColor(category) {
+  const key = (category||'').toLowerCase().trim();
+  return EBOOK_CAT_COLORS[key] || EBOOK_CAT_COLORS['default'];
+}
 function renderEbook(){
   const {data} = state;
   const isAdmin = state.user && state.user.role==='comdev komida';
@@ -1435,81 +1465,41 @@ function renderEbook(){
   function renderEbookCats() {
     catsArea.innerHTML = '';
     const filtered = getFiltered();
-
     if(filtered.length === 0) {
       catsArea.appendChild(el('div',{class:'search-no-result'},'E-book tidak ditemukan 🔍'));
       return;
     }
-
-    // Jika ada pencarian → tampilkan flat grid tanpa kategori
-    if(ebookSearch) {
-      const grid = el('div',{class:'ebook-grid'});
-      filtered.forEach(eb => grid.appendChild(makeEbookCard(eb)));
-      catsArea.appendChild(grid);
-      return;
-    }
-
-    // Kelompokkan per kategori
-    const cats = {};
-    filtered.forEach(eb => {
-      const cat = eb.category || 'Lainnya';
-      if(!cats[cat]) cats[cat] = [];
-      cats[cat].push(eb);
-    });
-
-    // Tab kategori
-    const allCats = Object.keys(cats);
-    if(allCats.length > 1) {
-      let activeCat = allCats[0];
-      const tabsWrap = el('div',{class:'quiz-cat-tabs'});
-      const tabEls = {};
-      const gridArea = el('div',{});
-
-      function renderCatGrid() {
-        gridArea.innerHTML = '';
-        const grid = el('div',{class:'ebook-grid'});
-        (cats[activeCat]||[]).forEach(eb => grid.appendChild(makeEbookCard(eb)));
-        gridArea.appendChild(grid);
-      }
-
-      allCats.forEach(cat => {
-        const tab = el('button',{
-          class:'quiz-cat-tab'+(cat===activeCat?' active':''),
-          onClick:()=>{
-            activeCat=cat;
-            Object.values(tabEls).forEach(t=>t.classList.remove('active'));
-            tab.classList.add('active');
-            renderCatGrid();
-          }
-        },`${cat} (${cats[cat].length})`);
-        tabEls[cat] = tab;
-        tabsWrap.appendChild(tab);
-      });
-      catsArea.appendChild(tabsWrap);
-      renderCatGrid();
-      catsArea.appendChild(gridArea);
-    } else {
-      // Hanya 1 kategori — langsung grid
-      const grid = el('div',{class:'ebook-grid'});
-      filtered.forEach(eb => grid.appendChild(makeEbookCard(eb)));
-      catsArea.appendChild(grid);
-    }
+    // Selalu tampil flat grid — warna cover membedakan kategori
+    const grid = el('div',{class:'ebook-grid'});
+    filtered.forEach(eb => grid.appendChild(makeEbookCard(eb)));
+    catsArea.appendChild(grid);
   }
 
   function makeEbookCard(eb) {
-    const ec = el('div',{class:'card ebook-card'});
-    ec.appendChild(el('div',{class:'ebook-cover'},'📗'));
-    if(eb.category) ec.appendChild(el('span',{class:'tag',style:{marginBottom:'8px',display:'inline-block'}},eb.category));
-    ec.appendChild(el('div',{class:'ebook-title'},eb.title));
-    if(eb.description) ec.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'10px',lineHeight:'1.6'}},eb.description));
-    if(eb.url){
-      ec.appendChild(el('a',{href:eb.url,target:'_blank',rel:'noreferrer',style:{fontSize:'12px',color:'var(--green5)',textDecoration:'none'}},'📥 Unduh / Buka →'));
-    } else {
-      ec.appendChild(el('span',{style:{fontSize:'12px',color:'var(--text3)'}},'Tidak ada link'));
+    const color = getEbookColor(eb.category);
+    const ec = el('div',{class:'card ebook-card',style:{padding:'12px',border:'1px solid var(--green2)'}});
+
+    // Cover berwarna
+    const cover = el('div',{class:'ebook-cover',style:{background:color.bg}});
+    cover.appendChild(document.createTextNode(color.emoji));
+    if(eb.category){
+      const lbl = el('div',{class:'ebook-cover-label'},eb.category);
+      cover.appendChild(lbl);
     }
+
+    // Klik cover → buka link
+    if(eb.url){
+      cover.style.cursor='pointer';
+      cover.onclick=()=>window.open(eb.url,'_blank','noreferrer');
+    }
+    ec.appendChild(cover);
+
+    ec.appendChild(el('div',{class:'ebook-title-small'},eb.title));
+    if(eb.description) ec.appendChild(el('div',{class:'ebook-desc-small'},eb.description));
+
     if(isAdmin){
-      const eca = el('div',{class:'card-actions'});
-      eca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:()=>{
+      const eca = el('div',{class:'card-actions',style:{flexDirection:'column',gap:'4px',marginTop:'8px',paddingTop:'8px'}});
+      eca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'11px',padding:'4px 10px',width:'100%'},onClick:()=>{
         let ef={title:eb.title,category:eb.category,description:eb.description,url:eb.url};
         const m=modal([
           el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Edit E-Book'),
@@ -1523,13 +1513,13 @@ function renderEbook(){
               const updated={...eb,...ef};
               state.data.ebooks=state.data.ebooks.map(e=>e.id===eb.id?updated:e);
               if(eb._key) fbSet('ebooks/'+eb._key,updated);
-              removeModal(m); renderEbookCats();
+              removeModal(m); setState({});
             }},'Simpan'),
             el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
           )
         ],()=>removeModal(m));
       }},'✏️ Edit'));
-      eca.appendChild(el('button',{class:'btn-danger',onClick:()=>{
+      eca.appendChild(el('button',{class:'btn-danger',style:{fontSize:'11px',padding:'4px 10px',width:'100%'},onClick:()=>{
         if(!confirm(`Hapus e-book "${eb.title}"?`))return;
         state.data.ebooks=(state.data.ebooks||[]).filter(e=>e.id!==eb.id);
         if(eb._key) fbDelete('ebooks/'+eb._key);
@@ -1841,9 +1831,16 @@ function renderAdmin(){
   const logCard = el('div',{class:'card',style:{marginBottom:'20px'}});
   const logHeader = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}});
   logHeader.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)'}},'👤 Riwayat Login'));
-  const clearBtn = el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:()=>{
-    if(!confirm('Hapus semua riwayat login?')) return;
+  const clearBtn = el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:async()=>{
+    if(!confirm('Hapus semua riwayat login? Data di Firebase juga akan terhapus.')) return;
+    clearBtn.textContent='Menghapus...';
+    clearBtn.disabled=true;
+    // Hapus dari Firebase
+    await fbDelete('loginlog');
     state.loginLog=[]; state.counter=0;
+    save('comdev_user', state.user); // simpan user tetap login
+    clearBtn.textContent='Hapus Semua';
+    clearBtn.disabled=false;
     render();
   }});
   clearBtn.textContent='Hapus Semua';
