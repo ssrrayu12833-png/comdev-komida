@@ -465,9 +465,11 @@ async function initData() {
     state.data.blogs   = blogs   ? Object.entries(blogs).map(([k,v])=>({...v,_key:k}))   : [];
     state.data.quizzes = quizzes ? Object.entries(quizzes).map(([k,v])=>({...v,_key:k})) : [];
     state.data.ebooks  = ebooks  ? Object.entries(ebooks).map(([k,v])=>({...v,_key:k}))  : [];
-    state.data.modules = modules || {};
-    // Inisialisasi modul default ke Firebase jika belum ada sama sekali
-    if(!modules) {
+    // Hanya pakai data Firebase jika ada — jangan overwrite dengan default
+    if(modules && typeof modules === 'object' && Object.keys(modules).length > 0) {
+      state.data.modules = modules;
+    } else {
+      // Firebase kosong — inisialisasi modul default
       MODULES.forEach(m=>{ state.data.modules[m]={subModuls:{}}; });
       saveModules();
     }
@@ -1630,8 +1632,40 @@ function renderAdmin(){
   const cabangSorted = Object.entries(cabangCount).sort((a,b)=>b[1]-a[1]);
 
   const wrap = el('div',{class:'page-pad fade-in'});
-  wrap.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'30px',color:'var(--green5)',marginBottom:'4px'}},'Panel Admin'));
-  wrap.appendChild(el('p',{style:{fontSize:'14px',color:'var(--text3)',marginBottom:'24px'}},'Kelola konten dan pantau aktivitas website'));
+  const adminHeader = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:'24px'}});
+  const adminTitleWrap = el('div');
+  adminTitleWrap.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'30px',color:'var(--green5)',marginBottom:'4px'}},'Panel Admin'));
+  adminTitleWrap.appendChild(el('p',{style:{fontSize:'14px',color:'var(--text3)'}},'Kelola konten dan pantau aktivitas website'));
+  adminHeader.appendChild(adminTitleWrap);
+
+  // Tombol pulihkan modul
+  const recoverBtn = el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:async()=>{
+    if(!confirm('Pulihkan semua modul default ke Firebase? Modul kustom yang sudah dihapus akan muncul kembali.')) return;
+    recoverBtn.textContent = 'Memulihkan...';
+    recoverBtn.disabled = true;
+    // Ambil data modul yang ada dulu
+    const existing = await fbGet('modules') || {};
+    // Tambahkan modul default yang belum ada
+    let changed = false;
+    MODULES.forEach(m=>{
+      if(!existing[m]) {
+        existing[m] = {subModuls:{}};
+        changed = true;
+      }
+    });
+    if(changed) {
+      state.data.modules = existing;
+      await saveModules();
+      setState({});
+      alert('Modul berhasil dipulihkan!');
+    } else {
+      alert('Semua modul sudah ada, tidak perlu dipulihkan.');
+    }
+    recoverBtn.textContent = '🔄 Pulihkan Modul Default';
+    recoverBtn.disabled = false;
+  }},'🔄 Pulihkan Modul Default');
+  adminHeader.appendChild(recoverBtn);
+  wrap.appendChild(adminHeader);
 
   // ── STATS CARDS ──
   const stats = el('div',{class:'admin-stats',style:{gridTemplateColumns:'repeat(4,1fr)'}});
