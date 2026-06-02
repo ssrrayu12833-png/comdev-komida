@@ -467,7 +467,14 @@ async function initData() {
     state.data.ebooks  = ebooks  ? Object.entries(ebooks).map(([k,v])=>({...v,_key:k}))  : [];
     // Hanya pakai data Firebase jika ada — jangan overwrite dengan default
     if(modules && typeof modules === 'object' && Object.keys(modules).length > 0) {
-      state.data.modules = modules;
+      // Kembalikan key yang punya _ menjadi nama aslinya (match dengan MODULES)
+      const restored = {};
+      Object.entries(modules).forEach(([k,v])=>{
+        // Cari nama asli di MODULES yang match setelah di-encode
+        const original = MODULES.find(m=>m.replace(/[.#$\[\]/]/g,'_')===k) || k;
+        restored[original] = v;
+      });
+      state.data.modules = restored;
     } else {
       // Firebase kosong — inisialisasi modul default
       MODULES.forEach(m=>{ state.data.modules[m]={subModuls:{}}; });
@@ -483,7 +490,14 @@ async function initData() {
   state.loading = false; render();
 }
 async function saveModules() {
-  await fbSet('modules', state.data.modules);
+  // Encode nama modul yang jadi key Firebase (hapus karakter tidak aman)
+  // Firebase tidak support: . # $ [ ] /
+  const safeMods = {};
+  Object.entries(state.data.modules).forEach(([k,v])=>{
+    const safeK = k.replace(/[.#$\[\]/]/g,'_');
+    safeMods[safeK] = v;
+  });
+  await fbSet('modules', safeMods);
 }
 async function recordLogin(user) {
   const waktu = new Date().toLocaleString('id-ID');
@@ -1644,26 +1658,28 @@ function renderAdmin(){
     recoverBtn.textContent = 'Memulihkan...';
     recoverBtn.disabled = true;
     try {
-      // Paksa tulis semua modul default, gabung dengan yang sudah ada
-      const existing = await fbGet('modules') || {};
-      const newModules = {...existing};
-      MODULES.forEach(m=>{
-        if(!newModules[m]) newModules[m] = {subModuls:{}};
-      });
-      // Langsung PUT ke Firebase
-      const res = await fetch(`${FB_URL}/modules.json`, {
-        method: 'PUT',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(newModules)
-      });
-      const result = await res.json();
-      if(result && typeof result === 'object') {
-        state.data.modules = newModules;
-        setState({});
-        alert('✅ Modul berhasil dipulihkan! ' + Object.keys(newModules).length + ' modul tersedia.');
-      } else {
-        alert('❌ Gagal menyimpan ke Firebase. Coba lagi.');
+      let sukses = 0, gagal = 0;
+      // Tulis per modul satu per satu pakai PATCH
+      for(const m of MODULES) {
+        if(!state.data.modules[m]) {
+          try {
+            const safeKey = m.replace(/[.#$\[\]/]/g, '_');
+            const res = await fetch(`${FB_URL}/modules/${encodeURIComponent(safeKey)}.json`, {
+              method: 'PUT',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({subModuls:{}})
+            });
+            const r = await res.json();
+            if(r !== null) {
+              state.data.modules[m] = {subModuls:{}};
+              sukses++;
+            } else { gagal++; }
+          } catch(e2) { gagal++; }
+        } else { sukses++; }
+        recoverBtn.textContent = `Memulihkan... ${sukses}/${MODULES.length}`;
       }
+      setState({});
+      alert(`✅ Selesai! ${sukses} modul berhasil, ${gagal} gagal.`);
     } catch(e) {
       alert('❌ Error: ' + e.message);
     }
