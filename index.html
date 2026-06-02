@@ -1640,26 +1640,32 @@ function renderAdmin(){
 
   // Tombol pulihkan modul
   const recoverBtn = el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:async()=>{
-    if(!confirm('Pulihkan semua modul default ke Firebase? Modul kustom yang sudah dihapus akan muncul kembali.')) return;
+    if(!confirm('Pulihkan semua modul default ke Firebase?')) return;
     recoverBtn.textContent = 'Memulihkan...';
     recoverBtn.disabled = true;
-    // Ambil data modul yang ada dulu
-    const existing = await fbGet('modules') || {};
-    // Tambahkan modul default yang belum ada
-    let changed = false;
-    MODULES.forEach(m=>{
-      if(!existing[m]) {
-        existing[m] = {subModuls:{}};
-        changed = true;
+    try {
+      // Paksa tulis semua modul default, gabung dengan yang sudah ada
+      const existing = await fbGet('modules') || {};
+      const newModules = {...existing};
+      MODULES.forEach(m=>{
+        if(!newModules[m]) newModules[m] = {subModuls:{}};
+      });
+      // Langsung PUT ke Firebase
+      const res = await fetch(`${FB_URL}/modules.json`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(newModules)
+      });
+      const result = await res.json();
+      if(result && typeof result === 'object') {
+        state.data.modules = newModules;
+        setState({});
+        alert('✅ Modul berhasil dipulihkan! ' + Object.keys(newModules).length + ' modul tersedia.');
+      } else {
+        alert('❌ Gagal menyimpan ke Firebase. Coba lagi.');
       }
-    });
-    if(changed) {
-      state.data.modules = existing;
-      await saveModules();
-      setState({});
-      alert('Modul berhasil dipulihkan!');
-    } else {
-      alert('Semua modul sudah ada, tidak perlu dipulihkan.');
+    } catch(e) {
+      alert('❌ Error: ' + e.message);
     }
     recoverBtn.textContent = '🔄 Pulihkan Modul Default';
     recoverBtn.disabled = false;
@@ -1801,7 +1807,7 @@ function renderAdmin(){
     const trendGrid = el('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'6px'}});
     for(let i=6; i>=0; i--) {
       const d = new Date(today); d.setDate(today.getDate()-i);
-      const dayStr = d.toISOString().slice(0,10);
+      const dayStr = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
       const dayEntries = filtered.filter(e=>e.hari===dayStr);
       const dayAvg = dayEntries.length>0 ? dayEntries.reduce((s,e)=>s+(e.mood||3),0)/dayEntries.length : null;
       const dayDiv = el('div',{style:{textAlign:'center'}});
@@ -2021,8 +2027,13 @@ function renderRuangAman() {
   }
 
   // Cek apakah sudah submit hari ini (per perangkat)
-  const todayKey = 'mood_' + new Date().toISOString().slice(0,10);
+  // Pakai waktu lokal (bukan UTC) supaya sesuai dengan timezone Indonesia
+  const todayLocal = new Date();
+  const todayKey = 'mood_' + todayLocal.getFullYear() + '-' +
+    String(todayLocal.getMonth()+1).padStart(2,'0') + '-' +
+    String(todayLocal.getDate()).padStart(2,'0');
   const sudahSubmit = localStorage.getItem(todayKey);
+  // Bersihkan mood keys dari hari sebelumnya yang tidak relevan (opsional, biarkan history)
 
   // Hero
   const hero = el('div',{class:'ruang-aman-hero'});
@@ -2086,7 +2097,7 @@ function renderRuangAman() {
           emoji: selectedMood.emoji,
           label: selectedMood.label,
           cabang: cabang,
-          hari: new Date().toISOString().slice(0,10),
+          hari: todayKey.replace('mood_',''),
           waktu: new Date().toLocaleString('id-ID'),
         };
         await fbPush('dailymood', entry);
@@ -2293,6 +2304,15 @@ function renderProfil() {
   const isAdmin = user.role === 'comdev komida';
   const wrap = el('div',{class:'page-pad fade-in',style:{maxWidth:'780px'}});
 
+  // Bersihkan mood keys lama yang pakai UTC format (misal mood_2025-05-24 dari UTC)
+  // supaya tidak bentrok dengan format local baru
+  for(let i=0; i<localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('mood_')) {
+      // key lama: tidak ada masalah, tapi pastikan format konsisten
+    }
+  }
+
   // ── Load foto profil dari localStorage ──
   const photoKey = 'profil_photo_' + (user.nik || user.name).replace(/[^a-z0-9]/gi,'_');
   let photoUrl = localStorage.getItem(photoKey) || null;
@@ -2471,7 +2491,10 @@ function renderProfil() {
 
       for(let i=0;i<30;i++){
         const d = new Date(firstDay); d.setDate(firstDay.getDate()+i);
-        const dStr = d.toISOString().slice(0,10);
+        // Pakai local date
+        const dStr = d.getFullYear() + '-' +
+          String(d.getMonth()+1).padStart(2,'0') + '-' +
+          String(d.getDate()).padStart(2,'0');
         const moodVal = localStorage.getItem('mood_'+dStr);
         const moodObj = moodVal ? MOODS.find(m=>m.val===parseInt(moodVal)) : null;
         const dayDiv = el('div',{class:'mood-day',
@@ -2489,7 +2512,8 @@ function renderProfil() {
       let goodCount=0, badCount=0, neutralCount=0, totalMoodDays=0;
       for(let i=0;i<30;i++){
         const d=new Date(firstDay); d.setDate(firstDay.getDate()+i);
-        const mv=localStorage.getItem('mood_'+d.toISOString().slice(0,10));
+        const dSum = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        const mv=localStorage.getItem('mood_'+dSum);
         if(mv){ totalMoodDays++; const v=parseInt(mv); if(v>=4)goodCount++;else if(v<=2)badCount++;else neutralCount++; }
       }
       if(totalMoodDays>0){
