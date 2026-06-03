@@ -490,12 +490,16 @@ async function initData() {
   state.loading = false; render();
 }
 async function saveModules() {
-  // Encode nama modul yang jadi key Firebase (hapus karakter tidak aman)
-  // Firebase tidak support: . # $ [ ] /
+  // Encode nama modul & sub modul yang jadi key Firebase
   const safeMods = {};
   Object.entries(state.data.modules).forEach(([k,v])=>{
     const safeK = k.replace(/[.#$\[\]/]/g,'_');
-    safeMods[safeK] = v;
+    const safeSubs = {};
+    Object.entries(v.subModuls||{}).forEach(([sk,sv])=>{
+      const safeSK = sk.replace(/[.#$\[\]/]/g,'_');
+      safeSubs[safeSK] = sv;
+    });
+    safeMods[safeK] = {...v, subModuls: safeSubs};
   });
   await fbSet('modules', safeMods);
 }
@@ -979,7 +983,11 @@ function renderModul() {
           if(!confirm(`Hapus sub modul "${name}" beserta semua materinya?`)) return;
           delete state.data.modules[activeModule].subModuls[name];
           setState({});
+          // Simpan perubahan sub modul ke Firebase
           saveModules();
+          const safeModKey2 = activeModule.replace(/[.#$\[\]/]/g,'_');
+          const safeSubKey = name.replace(/[.#$\[\]/]/g,'_');
+          fbDelete(`modules/${encodeURIComponent(safeModKey2)}/subModuls/${encodeURIComponent(safeSubKey)}`);
         }},'🗑 Hapus'));
         sc.appendChild(sca);
       }
@@ -1052,7 +1060,9 @@ function renderModul() {
         if(!confirm(`Hapus modul "${mod}" beserta semua isinya?`)) return;
         delete state.data.modules[mod];
         setState({});
-        saveModules();
+        // Hapus langsung dari Firebase pakai key yang sudah di-encode
+        const safeModKey = mod.replace(/[.#$\[\]/]/g,'_');
+        fbDelete('modules/' + encodeURIComponent(safeModKey));
       }},'🗑 Hapus'));
       mc.appendChild(mca2);
     }
@@ -1932,6 +1942,43 @@ function renderAdmin(){
   }
   wrap.appendChild(nc);
 
+  // ── REGISTRY STAF ──
+  const regCard = el('div',{class:'card',style:{marginBottom:'20px'}});
+  regCard.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)',marginBottom:'14px'}},'🪪 Registry Staf'));
+  const regContent = el('div',{});
+  regCard.appendChild(regContent);
+
+  (async()=>{
+    const registry = await fbGet('stafRegistry');
+    regContent.innerHTML = '';
+    if(!registry || Object.keys(registry).length===0){
+      regContent.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',textAlign:'center',padding:'16px 0'}},'Belum ada staf terdaftar.'));
+      return;
+    }
+    const stafList = Object.values(registry).sort((a,b)=>b.jumlahLogin-a.jumlahLogin);
+    const tbl = document.createElement('table');
+    tbl.style.cssText='width:100%;border-collapse:collapse;font-size:13px;';
+    const thead = tbl.createTHead();
+    const hr = thead.insertRow();
+    ['No','NIK','Nama','Cabang','Total Login','Login Terakhir'].forEach(h=>{
+      const th=document.createElement('th');
+      th.textContent=h;
+      th.style.cssText='text-align:left;padding:8px 10px;border-bottom:2px solid var(--green2);color:var(--green5);font-weight:500;font-size:12px;';
+      hr.appendChild(th);
+    });
+    const tbody = tbl.createTBody();
+    stafList.forEach((s,i)=>{
+      const tr=tbody.insertRow(); tr.style.borderBottom='1px solid var(--green1)';
+      [i+1, s.nik||'-', s.nama||'-', s.cabang||'-', (s.jumlahLogin||0)+'x', s.terakhirLogin||'-'].forEach(val=>{
+        const td=tr.insertCell(); td.textContent=val;
+        td.style.cssText='padding:8px 10px;color:var(--text2);';
+      });
+    });
+    tbl.appendChild(tbody);
+    regContent.appendChild(tbl);
+  })();
+  wrap.appendChild(regCard);
+
   // ── RIWAYAT LOGIN ──
   const logCard = el('div',{class:'card',style:{marginBottom:'20px'}});
   const logHeader = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}});
@@ -2276,19 +2323,61 @@ function renderLanding(){
     onClick: doLogin}, 'Masuk ke Platform →');
   rbox.appendChild(loginBtn);
 
-  function doLogin(){
+  async function doLogin(){
     const name = nameInput.value.trim();
     if(!name){ errorBox.textContent='Masukkan nama Anda'; errorBox.style.display='block'; return; }
     if(!selectedRole){ errorBox.textContent='Pilih kategori pengguna'; errorBox.style.display='block'; return; }
     if(selectedRole==='comdev komida' && passInput.value!=='perempuanberdaya'){
       errorBox.textContent='Password salah. Coba lagi.'; errorBox.style.display='block'; return; }
+
     if(selectedRole==='staf komida'){
       const nik = nikInput.value.trim();
       if(!nik){ errorBox.textContent='Masukkan NIK karyawan.'; errorBox.style.display='block'; return; }
       if(!/^\d{6}\/\d{4}$/.test(nik)){ errorBox.textContent='Format NIK tidak valid. Gunakan: 000000/0000'; errorBox.style.display='block'; return; }
       if(!cabangInput.value.trim()){ errorBox.textContent='Masukkan nama cabang.'; errorBox.style.display='block'; return; }
+
+      // Validasi NIK vs nama di Firebase
+      loginBtn.textContent = 'Memverifikasi...';
+      loginBtn.disabled = true;
+      try {
+        const nikSafeKey = nik.replace(/\//g, '_');
+        const existing = await fbGet('stafRegistry/' + nikSafeKey);
+        if(existing) {
+          // NIK sudah terdaftar — cek nama cocok atau tidak
+          if(existing.nama.toLowerCase() !== name.toLowerCase()) {
+            errorBox.textContent = `NIK ${nik} sudah terdaftar atas nama "${existing.nama}". Nama tidak sesuai.`;
+            errorBox.style.display = 'block';
+            loginBtn.textContent = 'Masuk ke Platform →';
+            loginBtn.disabled = false;
+            return;
+          }
+          // NIK + nama cocok — update login count
+          await fbSet('stafRegistry/' + nikSafeKey, {
+            nama: existing.nama,
+            cabang: cabangInput.value.trim().toLowerCase(),
+            nik: nik,
+            jumlahLogin: (existing.jumlahLogin||0) + 1,
+            terakhirLogin: new Date().toLocaleString('id-ID')
+          });
+        } else {
+          // NIK baru — daftarkan
+          await fbSet('stafRegistry/' + nikSafeKey, {
+            nama: name,
+            cabang: cabangInput.value.trim().toLowerCase(),
+            nik: nik,
+            jumlahLogin: 1,
+            terakhirLogin: new Date().toLocaleString('id-ID')
+          });
+        }
+      } catch(e) {
+        // Kalau Firebase error, tetap izinkan login tapi tidak validasi
+        console.warn('Registry check failed:', e);
+      }
+      loginBtn.textContent = 'Masuk ke Platform →';
+      loginBtn.disabled = false;
     }
-    const nik    = selectedRole==='staf komida' ? nikInput.value.trim()           : null;
+
+    const nik    = selectedRole==='staf komida' ? nikInput.value.trim() : null;
     const cabang = selectedRole==='staf komida' ? cabangInput.value.trim().toLowerCase() : null;
     const newUser = {name, role: selectedRole, nik, cabang};
     setState({user: newUser, page:'beranda'});
