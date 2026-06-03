@@ -2320,7 +2320,7 @@ function renderLanding(){
   rbox.appendChild(errorBox);
 
   const loginBtn = el('button',{class:'btn-primary',style:{width:'100%',padding:'12px',fontSize:'14px'},
-    onClick: doLogin}, 'Masuk ke Platform →');
+    onClick: ()=>doLogin()}, 'Masuk ke Platform →');
   rbox.appendChild(loginBtn);
 
   async function doLogin(){
@@ -2370,20 +2370,32 @@ function renderLanding(){
           });
         }
       } catch(e) {
-        // Kalau Firebase error, tetap izinkan login tapi tidak validasi
         console.warn('Registry check failed:', e);
+        errorBox.textContent = 'Gagal verifikasi NIK. Periksa koneksi internet lalu coba lagi.';
+        errorBox.style.display = 'block';
+        loginBtn.textContent = 'Masuk ke Platform →';
+        loginBtn.disabled = false;
+        return; // Blokir login kalau Firebase tidak bisa diakses
       }
       loginBtn.textContent = 'Masuk ke Platform →';
       loginBtn.disabled = false;
+      // Login staf berhasil setelah validasi
+      const nikVal = nikInput.value.trim();
+      const cabangVal = cabangInput.value.trim().toLowerCase();
+      const newUserStaf = {name, role: selectedRole, nik: nikVal, cabang: cabangVal};
+      setState({user: newUserStaf, page:'beranda'});
+      recordLogin(newUserStaf);
+      return; // Jangan lanjut ke bawah
     }
 
-    const nik    = selectedRole==='staf komida' ? nikInput.value.trim() : null;
-    const cabang = selectedRole==='staf komida' ? cabangInput.value.trim().toLowerCase() : null;
-    const newUser = {name, role: selectedRole, nik, cabang};
-    setState({user: newUser, page:'beranda'});
-    recordLogin(newUser);
+    // Untuk non-staf langsung login
+    if(selectedRole !== 'staf komida') {
+      const newUser = {name, role: selectedRole, nik: null, cabang: null};
+      setState({user: newUser, page:'beranda'});
+      recordLogin(newUser);
+    }
   }
-  nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }); // async handled inside
   passInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 
   grid.appendChild(rbox);
