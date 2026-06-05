@@ -1110,27 +1110,66 @@ function renderModul() {
 
   // Search bar modul — cari sampai ke materi
   let modulSearch = '';
-  const modSearchBar = createSearchBar('Cari modul, sub modul, atau judul materi...', q=>{
+  const modSearchBar = createSearchBar('Cari artikel... coba: "cara mengatasi stress", "keuangan keluarga"...', q=>{
     modulSearch=q; renderModGrid();
   });
   wrap.appendChild(modSearchBar);
 
   // Fungsi cari materi di semua modul
+  // Sinonim / kata terkait untuk query umum bahasa Indonesia
+  const SINONIM = {
+    'sedih':    ['sedih','murung','galau','berduka','kesepian','depresi','stress','muram'],
+    'senang':   ['senang','bahagia','gembira','suka','ceria','positif'],
+    'stress':   ['stress','stres','tertekan','burnout','lelah','capek','beban'],
+    'marah':    ['marah','emosi','amarah','konflik','kekerasan'],
+    'cemas':    ['cemas','khawatir','takut','panik','anxiety','gelisah'],
+    'sakit':    ['sakit','penyakit','kesehatan','gejala','nyeri'],
+    'uang':     ['uang','keuangan','tabungan','hutang','modal','ekonomi','finansial'],
+    'anak':     ['anak','bayi','balita','remaja','pendidikan','sekolah'],
+    'kerja':    ['kerja','usaha','bisnis','wirausaha','penghasilan','karir'],
+    'keluarga': ['keluarga','suami','istri','rumah tangga','pernikahan'],
+    'ngilangin':['menghilangkan','mengatasi','cara','tips','solusi','mengurangi'],
+    'cara':     ['cara','tips','langkah','panduan','solusi','metode'],
+    'belajar':  ['belajar','pendidikan','literasi','pengetahuan','wawasan'],
+  };
+
+  function expandKeywords(q) {
+    const words = q.toLowerCase().split(/\s+/).filter(w=>w.length>2);
+    const expanded = new Set(words);
+    words.forEach(w=>{
+      if(SINONIM[w]) SINONIM[w].forEach(s=>expanded.add(s));
+      // Juga cek apakah kata adalah bagian dari sinonim lain
+      Object.entries(SINONIM).forEach(([key,syns])=>{
+        if(syns.includes(w)) { expanded.add(key); syns.forEach(s=>expanded.add(s)); }
+      });
+    });
+    return [...expanded];
+  }
+
+  function scoreMateri(m, keywords) {
+    const title = m.title.toLowerCase();
+    const body  = (m.content||'').replace(/<[^>]*>/g,'').toLowerCase();
+    let score = 0;
+    keywords.forEach(kw=>{
+      if(title.includes(kw))  score += 3; // bobot judul lebih tinggi
+      if(body.includes(kw))   score += 1;
+    });
+    return score;
+  }
+
   function searchAllMateris(q) {
+    const keywords = expandKeywords(q);
     const results = [];
     Object.entries(allModules).forEach(([modName, mod])=>{
       Object.entries(mod.subModuls||{}).forEach(([subName, sub])=>{
         (sub.materis||[]).forEach(m=>{
-          if(
-            m.title.toLowerCase().includes(q) ||
-            (m.content||'').replace(/<[^>]*>/g,'').toLowerCase().includes(q)
-          ) {
-            results.push({modName, subName, materi: m});
-          }
+          const score = scoreMateri(m, keywords);
+          if(score > 0) results.push({modName, subName, materi:m, score});
         });
       });
     });
-    return results;
+    // Urutkan dari skor tertinggi
+    return results.sort((a,b)=>b.score-a.score);
   }
 
   const grid = el('div',{class:'module-grid'});
@@ -1142,19 +1181,30 @@ function renderModul() {
     searchResultArea.innerHTML = '';
 
     // Kalau ada search yang panjang (>2 huruf) — cari sampai ke materi
-    if(modulSearch.length > 2) {
+    if(modulSearch.length > 1) {
       const materisFound = searchAllMateris(modulSearch);
       if(materisFound.length > 0) {
         const resHeader = el('div',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'12px'}},
           `📄 ${materisFound.length} materi ditemukan:`);
         searchResultArea.appendChild(resHeader);
         const resList = el('div',{style:{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'20px'}});
-        materisFound.forEach(({modName,subName,materi})=>{
-          const rc = el('div',{class:'card',style:{cursor:'pointer',padding:'12px 16px'},
+        materisFound.slice(0,8).forEach(({modName,subName,materi,score})=>{
+          const rc = el('div',{class:'card',style:{cursor:'pointer',padding:'12px 16px',display:'flex',gap:'12px',alignItems:'flex-start'},
             onClick:()=>setState({activeModule:modName,activeSub:subName,activeMateri:materi,modulView:'materiDetail'})
           });
-          rc.appendChild(el('div',{style:{fontSize:'13px',fontWeight:'500',color:'var(--text1)',marginBottom:'2px'}},materi.title));
-          rc.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)'}},`${modName} › ${subName}`));
+          // Icon modul berwarna
+          const icon2 = el('div',{style:{
+            width:'36px',height:'36px',borderRadius:'8px',flexShrink:'0',
+            background:getModColor(modName),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'
+          }},MODULE_ICONS[modName]||'📖');
+          rc.appendChild(icon2);
+          const txt2 = el('div',{style:{flex:'1'}});
+          txt2.appendChild(el('div',{style:{fontSize:'13px',fontWeight:'500',color:'var(--text1)',marginBottom:'2px',lineHeight:'1.4'}},materi.title));
+          txt2.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'4px'}},`${modName} › ${subName}`));
+          // Snippet isi
+          const snippet = (materi.content||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim().slice(0,100);
+          if(snippet) txt2.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',lineHeight:'1.5'}},snippet+'...'));
+          rc.appendChild(txt2);
           resList.appendChild(rc);
         });
         searchResultArea.appendChild(resList);
