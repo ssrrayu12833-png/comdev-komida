@@ -639,7 +639,8 @@ function renderSidebar() {
   usr.appendChild(el('div',{class:'login-as'},'Masuk sebagai'));
   usr.appendChild(el('div',{class:'uname'},user.name));
   usr.appendChild(el('div',{class:'urole'},user.role));
-  if(user.nik) usr.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'2px'}},`NIK: ${user.nik}`));
+  if(user.nik && !user.nik.startsWith('MAGANG_')) usr.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'2px'}},`NIK: ${user.nik}`));
+  else if(user.tipe==='magang') usr.appendChild(el('div',{style:{fontSize:'11px',color:'var(--yellow5)',marginBottom:'2px'}},'Magang — belum ber-NIK'));
   if(user.cabang) usr.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'2px'}},`Cabang: ${user.cabang}`));
   usr.appendChild(el('button',{onClick:()=>setState({user:null,page:'beranda'})},'Keluar →'));
   s.appendChild(usr);
@@ -2139,7 +2140,7 @@ function renderAdmin(){
     tbl.style.cssText='width:100%;border-collapse:collapse;font-size:13px;';
     const thead = tbl.createTHead();
     const hr = thead.insertRow();
-    ['No','NIK','Nama','Cabang','Total Login','Login Terakhir'].forEach(h=>{
+    ['No','NIK','Tipe','Nama','Cabang','Total Login','Login Terakhir'].forEach(h=>{
       const th=document.createElement('th');
       th.textContent=h;
       th.style.cssText='text-align:left;padding:8px 10px;border-bottom:2px solid var(--green2);color:var(--green5);font-weight:500;font-size:12px;';
@@ -2148,7 +2149,8 @@ function renderAdmin(){
     const tbody = tbl.createTBody();
     stafList.forEach((s,i)=>{
       const tr=tbody.insertRow(); tr.style.borderBottom='1px solid var(--green1)';
-      [i+1, s.nik||'-', s.nama||'-', s.cabang||'-', (s.jumlahLogin||0)+'x', s.terakhirLogin||'-'].forEach(val=>{
+      const nikShow = (s.nik||'').startsWith('MAGANG_')?'(magang)':(s.nik||'-');
+      [i+1, nikShow, s.tipe||'tetap', s.nama||'-', s.cabang||'-', (s.jumlahLogin||0)+'x', s.terakhirLogin||'-'].forEach(val=>{
         const td=tr.insertCell(); td.textContent=val;
         td.style.cssText='padding:8px 10px;color:var(--text2);';
       });
@@ -2449,18 +2451,80 @@ function renderLanding(){
   const passInput = el('input',{type:'password',placeholder:'Masukkan password...'});
   passWrap.appendChild(passInput);
 
-  // NIK field (staf)
+  // Tipe staf selector
+  const tipeWrap = el('div',{style:{marginBottom:'14px',display:'none'}});
+  tipeWrap.appendChild(el('label',{class:'form-label'},'Tipe Karyawan'));
+  const tipeOptions = [
+    {val:'tetap',    label:'Staf Tetap / Kontrak',  hint:'NIK: 000000/0000'},
+    {val:'training', label:'Staf Training',          hint:'NIK: 0000/00/00'},
+    {val:'magang',   label:'Staf Magang',            hint:'Belum punya NIK'},
+  ];
+  let selectedTipe = 'tetap';
+  const tipeBtns = {};
+  const tipeGrid = el('div',{style:{display:'grid',gridTemplateColumns:'1fr',gap:'6px'}});
+  tipeOptions.forEach(t=>{
+    const btn = el('label',{class:'role-option'+(t.val==='tetap'?' selected':'')});
+    const radio = document.createElement('input');
+    radio.type='radio'; radio.name='tipe'; radio.value=t.val;
+    radio.style.cssText='width:auto;margin:0;border:none;padding:0;';
+    radio.checked = (t.val==='tetap');
+    radio.onchange = ()=>{
+      selectedTipe = t.val;
+      Object.values(tipeBtns).forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      updateNikUI();
+    };
+    btn.appendChild(radio);
+    const txtWrap = el('div');
+    txtWrap.appendChild(el('span',{},t.label));
+    txtWrap.appendChild(el('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'1px'}},t.hint));
+    btn.appendChild(txtWrap);
+    tipeBtns[t.val] = btn;
+    tipeGrid.appendChild(btn);
+  });
+  tipeWrap.appendChild(tipeGrid);
+
+  // NIK field (staf tetap & training)
   const nikWrap = el('div',{style:{marginBottom:'14px',display:'none'}});
   nikWrap.appendChild(el('label',{class:'form-label'},'NIK Karyawan'));
   const nikInput = el('input',{type:'text',placeholder:'000000/0000',maxlength:'11'});
-  nikInput.addEventListener('input', e => {
-    let val = e.target.value.replace(/[^0-9/]/g,'');
-    if(val.length === 6 && !val.includes('/')) val = val + '/';
-    if(val.length > 11) val = val.slice(0,11);
-    nikInput.value = val;
-  });
+  const nikHint  = el('div',{class:'nik-format'});
   nikWrap.appendChild(nikInput);
-  nikWrap.appendChild(el('div',{class:'nik-format'},'Format: 000000/0000 · Contoh: 008286/2020'));
+  nikWrap.appendChild(nikHint);
+
+  function updateNikUI(){
+    if(selectedTipe==='magang'){
+      nikWrap.style.display='none';
+      nikInput.value='MAGANG';
+    } else if(selectedTipe==='training'){
+      nikWrap.style.display='block';
+      nikInput.value='';
+      nikInput.maxLength=10;
+      nikInput.placeholder='0000/00/00';
+      nikHint.textContent='Format: 0000/00/00 · Contoh: 2024/01/15';
+      nikInput.oninput = e=>{
+        let val=e.target.value.replace(/[^0-9/]/g,'');
+        // Auto format 0000/00/00
+        if(val.replace(/\//g,'').length===4 && !val.includes('/')) val=val+'/';
+        if(val.length===7 && val.split('/').length===2) val=val+'/';
+        if(val.length>10) val=val.slice(0,10);
+        nikInput.value=val;
+      };
+    } else {
+      nikWrap.style.display='block';
+      nikInput.value='';
+      nikInput.maxLength=11;
+      nikInput.placeholder='000000/0000';
+      nikHint.textContent='Format: 000000/0000 · Contoh: 008286/2020';
+      nikInput.oninput = e=>{
+        let val=e.target.value.replace(/[^0-9/]/g,'');
+        if(val.length===6 && !val.includes('/')) val=val+'/';
+        if(val.length>11) val=val.slice(0,11);
+        nikInput.value=val;
+      };
+    }
+  }
+  updateNikUI();
 
   // Cabang field (staf)
   const cabangWrap = el('div',{style:{marginBottom:'14px',display:'none'}});
@@ -2480,9 +2544,9 @@ function renderLanding(){
       errorBox.style.display = 'none';
       roleOptions.forEach(o => o.el.classList.toggle('selected', o.r===r));
       passWrap.style.display   = (r==='comdev komida') ? 'block' : 'none';
-      nikWrap.style.display    = (r==='staf komida')   ? 'block' : 'none';
+      tipeWrap.style.display   = (r==='staf komida')   ? 'block' : 'none';
       cabangWrap.style.display = (r==='staf komida')   ? 'block' : 'none';
-      if(r !== 'staf komida') { nikInput.value=''; cabangInput.value=''; }
+      if(r==='staf komida'){ updateNikUI(); } else { nikInput.value=''; cabangInput.value=''; nikWrap.style.display='none'; }
     };
     lbl.appendChild(radio);
     lbl.appendChild(el('span',{},r));
@@ -2492,6 +2556,7 @@ function renderLanding(){
 
   rbox.appendChild(roleWrap);
   rbox.appendChild(passWrap);
+  rbox.appendChild(tipeWrap);
   rbox.appendChild(nikWrap);
   rbox.appendChild(cabangWrap);
 
@@ -2510,61 +2575,94 @@ function renderLanding(){
       errorBox.textContent='Password salah. Coba lagi.'; errorBox.style.display='block'; return; }
 
     if(selectedRole==='staf komida'){
-      const nik = nikInput.value.trim();
-      if(!nik){ errorBox.textContent='Masukkan NIK karyawan.'; errorBox.style.display='block'; return; }
-      if(!/^\d{6}\/\d{4}$/.test(nik)){ errorBox.textContent='Format NIK tidak valid. Gunakan: 000000/0000'; errorBox.style.display='block'; return; }
       if(!cabangInput.value.trim()){ errorBox.textContent='Masukkan nama cabang.'; errorBox.style.display='block'; return; }
 
-      // Validasi NIK vs nama di Firebase
+      let nik = nikInput.value.trim();
+
+      // Validasi format NIK sesuai tipe
+      if(selectedTipe==='magang'){
+        nik = 'MAGANG_' + Date.now(); // ID unik sementara untuk magang
+      } else if(selectedTipe==='training'){
+        if(!nik){ errorBox.textContent='Masukkan NIK training.'; errorBox.style.display='block'; return; }
+        if(!/^\d{4}\/\d{2}\/\d{2}$/.test(nik)){
+          errorBox.textContent='Format NIK training tidak valid. Gunakan: 0000/00/00';
+          errorBox.style.display='block'; return;
+        }
+      } else {
+        if(!nik){ errorBox.textContent='Masukkan NIK karyawan.'; errorBox.style.display='block'; return; }
+        if(!/^\d{6}\/\d{4}$/.test(nik)){
+          errorBox.textContent='Format NIK tidak valid. Gunakan: 000000/0000';
+          errorBox.style.display='block'; return;
+        }
+      }
+
       loginBtn.textContent = 'Memverifikasi...';
       loginBtn.disabled = true;
+
       try {
-        const nikSafeKey = nik.replace(/\//g, '_');
-        const existing = await fbGet('stafRegistry/' + nikSafeKey);
-        if(existing) {
-          // NIK sudah terdaftar — cek nama cocok atau tidak
-          if(existing.nama.toLowerCase() !== name.toLowerCase()) {
-            errorBox.textContent = `NIK ${nik} sudah terdaftar atas nama "${existing.nama}". Nama tidak sesuai.`;
-            errorBox.style.display = 'block';
-            loginBtn.textContent = 'Masuk ke Platform →';
-            loginBtn.disabled = false;
-            return;
+        const nikSafeKey = nik.replace(/[\/]/g,'_');
+
+        if(selectedTipe==='magang'){
+          // Magang: cari berdasarkan nama dulu
+          const allReg = await fbGet('stafRegistry') || {};
+          const existing = Object.values(allReg).find(r=>
+            r.nama.toLowerCase()===name.toLowerCase() && r.tipe==='magang'
+          );
+          if(existing){
+            // Update login count
+            const existKey = Object.keys(allReg).find(k=>allReg[k]===existing);
+            await fbSet('stafRegistry/'+existKey, {
+              ...existing,
+              cabang: cabangInput.value.trim().toLowerCase(),
+              jumlahLogin: (existing.jumlahLogin||0)+1,
+              terakhirLogin: new Date().toLocaleString('id-ID')
+            });
+            nik = existing.nik || nikSafeKey;
+          } else {
+            // Magang baru — daftar dengan ID sementara
+            await fbSet('stafRegistry/'+nikSafeKey, {
+              nama: name, tipe:'magang', nik: nikSafeKey,
+              cabang: cabangInput.value.trim().toLowerCase(),
+              jumlahLogin:1, terakhirLogin: new Date().toLocaleString('id-ID')
+            });
           }
-          // NIK + nama cocok — update login count
-          await fbSet('stafRegistry/' + nikSafeKey, {
-            nama: existing.nama,
-            cabang: cabangInput.value.trim().toLowerCase(),
-            nik: nik,
-            jumlahLogin: (existing.jumlahLogin||0) + 1,
-            terakhirLogin: new Date().toLocaleString('id-ID')
-          });
         } else {
-          // NIK baru — daftarkan
-          await fbSet('stafRegistry/' + nikSafeKey, {
-            nama: name,
-            cabang: cabangInput.value.trim().toLowerCase(),
-            nik: nik,
-            jumlahLogin: 1,
-            terakhirLogin: new Date().toLocaleString('id-ID')
-          });
+          // Staf tetap/training — validasi NIK vs nama
+          const existing = await fbGet('stafRegistry/'+nikSafeKey);
+          if(existing){
+            if(existing.nama.toLowerCase()!==name.toLowerCase()){
+              errorBox.textContent=`NIK ${nik} sudah terdaftar atas nama "${existing.nama}". Nama tidak sesuai.`;
+              errorBox.style.display='block';
+              loginBtn.textContent='Masuk ke Platform →'; loginBtn.disabled=false;
+              return;
+            }
+            await fbSet('stafRegistry/'+nikSafeKey,{
+              ...existing,
+              cabang: cabangInput.value.trim().toLowerCase(),
+              jumlahLogin:(existing.jumlahLogin||0)+1,
+              terakhirLogin:new Date().toLocaleString('id-ID')
+            });
+          } else {
+            await fbSet('stafRegistry/'+nikSafeKey,{
+              nama:name, tipe:selectedTipe, nik,
+              cabang:cabangInput.value.trim().toLowerCase(),
+              jumlahLogin:1, terakhirLogin:new Date().toLocaleString('id-ID')
+            });
+          }
         }
-      } catch(e) {
-        console.warn('Registry check failed:', e);
-        errorBox.textContent = 'Gagal verifikasi NIK. Periksa koneksi internet lalu coba lagi.';
-        errorBox.style.display = 'block';
-        loginBtn.textContent = 'Masuk ke Platform →';
-        loginBtn.disabled = false;
-        return; // Blokir login kalau Firebase tidak bisa diakses
+      } catch(e){
+        console.warn('Registry check failed:',e);
+        errorBox.textContent='Gagal verifikasi. Periksa koneksi internet lalu coba lagi.';
+        errorBox.style.display='block';
+        loginBtn.textContent='Masuk ke Platform →'; loginBtn.disabled=false;
+        return;
       }
-      loginBtn.textContent = 'Masuk ke Platform →';
-      loginBtn.disabled = false;
-      // Login staf berhasil setelah validasi
-      const nikVal = nikInput.value.trim();
+      loginBtn.textContent='Masuk ke Platform →'; loginBtn.disabled=false;
       const cabangVal = cabangInput.value.trim().toLowerCase();
-      const newUserStaf = {name, role: selectedRole, nik: nikVal, cabang: cabangVal};
-      setState({user: newUserStaf, page:'beranda'});
+      const newUserStaf = {name, role:selectedRole, nik, tipe:selectedTipe, cabang:cabangVal};
+      setState({user:newUserStaf, page:'beranda'});
       recordLogin(newUserStaf);
-      return; // Jangan lanjut ke bawah
+      return;
     }
 
     // Untuk non-staf langsung login
@@ -2659,9 +2757,81 @@ function renderProfil() {
   const info = el('div',{style:{flex:'1'}});
   info.appendChild(el('div',{class:'profil-name'},user.name));
   info.appendChild(el('div',{class:'profil-role'},user.role));
-  if(user.nik)    info.appendChild(el('div',{class:'profil-meta'},'NIK: '+user.nik));
+  // Tampilkan NIK & tipe
+  const nikDisplay = user.nik && !user.nik.startsWith('MAGANG_') ? user.nik : '-';
+  const tipeLabel  = user.tipe==='magang'?'Staf Magang':user.tipe==='training'?'Staf Training':'Staf Tetap/Kontrak';
+  if(user.role==='staf komida'){
+    info.appendChild(el('div',{class:'profil-meta'},`Tipe: ${tipeLabel}`));
+    info.appendChild(el('div',{class:'profil-meta'},`NIK: ${nikDisplay}`));
+  }
   if(user.cabang) info.appendChild(el('div',{class:'profil-meta'},'Cabang: '+user.cabang));
   info.appendChild(el('div',{class:'profil-meta',style:{marginTop:'4px',fontSize:'11px',color:'var(--text3)'}},'Klik foto untuk ganti gambar profil'));
+
+  // Tombol Update NIK (untuk magang/training yang mau update)
+  if(user.role==='staf komida') {
+    const updateNikBtn = el('button',{class:'btn-secondary',style:{fontSize:'12px',marginTop:'10px'},
+      onClick:()=>{
+        let newNik='', newTipe=user.tipe||'tetap';
+        const m = modal([
+          el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)',marginBottom:'14px'}},'🪪 Update NIK'),
+          el('p',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'14px'}},'Gunakan fitur ini jika kamu baru mendapat NIK atau NIK berubah. Data lama tetap tersimpan.'),
+          el('label',{class:'form-label'},'Tipe Karyawan Baru'),
+          (() => {
+            const s = el('select',{style:{marginBottom:'12px'},onChange:e=>{
+              newTipe=e.target.value;
+              hintEl.textContent = newTipe==='training'?'Format: 0000/00/00':'Format: 000000/0000';
+              nikEl.placeholder  = newTipe==='training'?'0000/00/00':'000000/0000';
+            }});
+            [['tetap','Staf Tetap / Kontrak'],['training','Staf Training']].forEach(([v,l])=>{
+              const o=el('option',{value:v},l);
+              if(v===user.tipe) o.selected=true;
+              s.appendChild(o);
+            });
+            return s;
+          })(),
+          el('label',{class:'form-label'},'NIK Baru'),
+          (()=>{ nikEl = el('input',{type:'text',placeholder:'000000/0000',style:{marginBottom:'4px'},onInput:e=>newNik=e.target.value.trim()}); return nikEl; })(),
+          (()=>{ hintEl = el('div',{class:'nik-format',style:{marginBottom:'16px'}},user.tipe==='training'?'Format: 0000/00/00':'Format: 000000/0000'); return hintEl; })(),
+          el('div',{style:{display:'flex',gap:'10px'}},
+            el('button',{class:'btn-primary',onClick:async()=>{
+              if(!newNik){ alert('Masukkan NIK baru.'); return; }
+              const validTetap  = /^\d{6}\/\d{4}$/.test(newNik);
+              const validTrn    = /^\d{4}\/\d{2}\/\d{2}$/.test(newNik);
+              if(newTipe==='tetap'&&!validTetap){ alert('Format NIK tidak valid. Gunakan: 000000/0000'); return; }
+              if(newTipe==='training'&&!validTrn){ alert('Format NIK tidak valid. Gunakan: 0000/00/00'); return; }
+              // Cek NIK belum dipakai orang lain
+              const nikSafe = newNik.replace(/\//g,'_');
+              const existing = await fbGet('stafRegistry/'+nikSafe);
+              if(existing && existing.nama.toLowerCase()!==user.name.toLowerCase()){
+                alert(`NIK ${newNik} sudah dipakai oleh ${existing.nama}.`); return;
+              }
+              // Update Firebase — hapus entry lama (magang), buat entry baru
+              const oldNikSafe = (user.nik||'').replace(/\//g,'_');
+              if(oldNikSafe && oldNikSafe!==nikSafe) {
+                await fbDelete('stafRegistry/'+oldNikSafe);
+              }
+              const oldData = (await fbGet('stafRegistry/'+oldNikSafe)) || {};
+              await fbSet('stafRegistry/'+nikSafe,{
+                nama: user.name, tipe:newTipe, nik:newNik,
+                cabang: user.cabang||'',
+                jumlahLogin: oldData.jumlahLogin||1,
+                terakhirLogin: new Date().toLocaleString('id-ID')
+              });
+              // Update state & localStorage
+              const updatedUser = {...user, nik:newNik, tipe:newTipe};
+              save('comdev_user', updatedUser);
+              removeModal(m);
+              setState({user:updatedUser});
+              alert('✅ NIK berhasil diupdate!');
+            }},'Simpan NIK Baru'),
+            el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
+          )
+        ],()=>removeModal(m));
+        let nikEl, hintEl; // will be set inside modal
+      }
+    }, user.tipe==='magang'?'🪪 Daftarkan NIK':'🪪 Update NIK');
+    info.appendChild(updateNikBtn);
+  }
   hero.appendChild(info);
   wrap.appendChild(hero);
 
