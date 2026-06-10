@@ -308,6 +308,22 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 .toast-sapaan-emoji{font-size:28px;flex-shrink:0;}
 .toast-sapaan-name{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--green5);font-weight:600;}
 .toast-sapaan-sub{font-size:12px;color:var(--text3);}
+
+/* Global search */
+.global-search-wrap{position:relative;flex:1;max-width:320px;}
+.global-search-input{width:100%;padding:7px 14px 7px 34px;border:1.5px solid var(--green2);border-radius:20px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;background:white;color:var(--text1);transition:border-color .2s;}
+.global-search-input:focus{border-color:var(--green4);}
+.global-search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text3);}
+.global-results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:white;border:1px solid var(--green2);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:999;max-height:400px;overflow-y:auto;}
+.global-result-item{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--green1);}
+.global-result-item:hover{background:var(--green1);}
+.global-result-item:last-child{border-bottom:none;}
+.global-result-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+.global-result-title{font-size:13px;font-weight:500;color:var(--text1);line-height:1.4;}
+.global-result-sub{font-size:11px;color:var(--text3);margin-top:1px;}
+.global-result-snippet{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4;}
+.global-result-section{padding:6px 14px;font-size:10px;color:var(--green5);font-weight:600;letter-spacing:.5px;text-transform:uppercase;background:var(--green1);}
+@media(max-width:768px){.global-search-wrap{display:none;}}
 </style>
 </head>
 <body>
@@ -728,9 +744,117 @@ function renderTopbar() {
   const isAdmin = state.user && state.user.role==='comdev komida';
   const labels = {beranda:'🏠 Beranda',modul:'📖 Modul Literasi',ruangaman:'💚 Daily Mood Check',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel',profil:'👤 Profil Saya'};
   const bar = el('div',{id:'topbar'});
-  const left = el('div',{style:{display:'flex',alignItems:'center',gap:'10px'}});
+  const left = el('div',{style:{display:'flex',alignItems:'center',gap:'10px',flex:'1'}});
   left.appendChild(el('button',{id:'hamburger',onClick:toggleSidebar},'☰'));
-  left.appendChild(el('div',{style:{fontSize:'13px',color:'var(--text3)',textTransform:'capitalize'}}, labels[page]||page));
+  left.appendChild(el('div',{style:{fontSize:'13px',color:'var(--text3)',textTransform:'capitalize',flexShrink:'0'}}, labels[page]||page));
+
+  // Global search bar
+  const gsWrap = el('div',{class:'global-search-wrap'});
+  gsWrap.appendChild(el('span',{class:'global-search-icon'},'🔍'));
+  const gsInput = el('input',{type:'text',class:'global-search-input',placeholder:'Cari materi, quiz, e-book...'});
+  const gsResults = el('div',{class:'global-results',style:{display:'none'}});
+  gsWrap.appendChild(gsInput);
+  gsWrap.appendChild(gsResults);
+
+  let gsTimer;
+  gsInput.addEventListener('input', e=>{
+    clearTimeout(gsTimer);
+    const q = e.target.value.trim().toLowerCase();
+    if(q.length < 2){ gsResults.style.display='none'; return; }
+    gsTimer = setTimeout(()=>runGlobalSearch(q), 300);
+  });
+  gsInput.addEventListener('focus', e=>{
+    if(e.target.value.trim().length>=2) gsResults.style.display='block';
+  });
+  document.addEventListener('click', e=>{
+    if(!gsWrap.contains(e.target)) gsResults.style.display='none';
+  });
+
+  function runGlobalSearch(q) {
+    gsResults.innerHTML = '';
+    gsResults.style.display='block';
+    const keywords = q.split(/\s+/).filter(w=>w.length>1);
+    if(keywords.length===0){ keywords.push(q); }
+    const results = [];
+
+    // Cari materi
+    const allMods2 = state.data.modules||{};
+    Object.entries(allMods2).forEach(([modName,mod])=>{
+      Object.entries(mod.subModuls||{}).forEach(([subName,sub])=>{
+        (sub.materis||[]).forEach(m=>{
+          const title = (m.title||'').toLowerCase();
+          const body  = (m.content||'').replace(/<[^>]*>/g,'').toLowerCase();
+          let score=0;
+          keywords.forEach(kw=>{ if(title.includes(kw))score+=3; if(body.includes(kw))score+=1; });
+          if(score>0) results.push({type:'materi',icon:MODULE_ICONS[modName]||'📖',
+            title:m.title,sub:`${modName} › ${subName}`,
+            snippet:(m.content||'').replace(/<[^>]*>/g,'').slice(0,80),
+            score,onClick:()=>{
+              gsInput.value=''; gsResults.style.display='none';
+              setState({page:'modul',activeModule:modName,activeSub:subName,activeMateri:m,modulView:'materiDetail'});
+            }});
+        });
+      });
+    });
+
+    // Cari quiz
+    (state.data.quizzes||[]).forEach(qz=>{
+      const title=(qz.title||'').toLowerCase();
+      const cat=(qz.category||'').toLowerCase();
+      let score=0;
+      keywords.forEach(kw=>{ if(title.includes(kw))score+=3; if(cat.includes(kw))score+=2; });
+      (qz.questions||[]).forEach(q2=>{ if((q2.text||'').toLowerCase().includes(keywords[0]))score+=1; });
+      if(score>0) results.push({type:'quiz',icon:'🧩',title:qz.title,
+        sub:`Quiz · ${qz.category||'Umum'}`,snippet:`${qz.questions?.length||0} pertanyaan`,
+        score,onClick:()=>{
+          gsInput.value=''; gsResults.style.display='none';
+          setState({page:'quiz',activeQuiz:qz,quizView:'take',quizSubmitted:false,quizAnswers:{},quizScore:null});
+        }});
+    });
+
+    // Cari e-book
+    (state.data.ebooks||[]).forEach(eb=>{
+      const title=(eb.title||'').toLowerCase();
+      const desc=(eb.description||'').toLowerCase();
+      const cat=(eb.category||'').toLowerCase();
+      let score=0;
+      keywords.forEach(kw=>{ if(title.includes(kw))score+=3; if(desc.includes(kw))score+=1; if(cat.includes(kw))score+=2; });
+      if(score>0) results.push({type:'ebook',icon:'📚',title:eb.title,
+        sub:`E-Book · ${eb.category||''}`,snippet:eb.description||'',
+        score,onClick:()=>{
+          gsInput.value=''; gsResults.style.display='none';
+          setState({page:'ebook'});
+        }});
+    });
+
+    // Sort by score
+    results.sort((a,b)=>b.score-a.score);
+
+    if(results.length===0){
+      gsResults.appendChild(el('div',{style:{padding:'16px',textAlign:'center',fontSize:'13px',color:'var(--text3)'}},'Tidak ditemukan untuk "'+q+'"'));
+      return;
+    }
+
+    // Tampilkan per tipe
+    const sections = [{key:'materi',label:'📖 Materi'},{key:'quiz',label:'🧩 Quiz'},{key:'ebook',label:'📚 E-Book'}];
+    sections.forEach(sec=>{
+      const items = results.filter(r=>r.type===sec.key).slice(0,4);
+      if(items.length===0) return;
+      gsResults.appendChild(el('div',{class:'global-result-section'},sec.label+` (${items.length})`));
+      items.forEach(r=>{
+        const item = el('div',{class:'global-result-item',onClick:r.onClick});
+        item.appendChild(el('div',{class:'global-result-icon'},r.icon));
+        const txt = el('div',{style:{flex:'1'}});
+        txt.appendChild(el('div',{class:'global-result-title'},r.title));
+        txt.appendChild(el('div',{class:'global-result-sub'},r.sub));
+        if(r.snippet) txt.appendChild(el('div',{class:'global-result-snippet'},r.snippet.slice(0,80)+'...'));
+        item.appendChild(txt);
+        gsResults.appendChild(item);
+      });
+    });
+  }
+
+  left.appendChild(gsWrap);
   bar.appendChild(left);
   const right = el('div',{style:{display:'flex',alignItems:'center',gap:'10px'}});
   if(isAdmin){
@@ -987,7 +1111,7 @@ function renderModul() {
 
     // Search bar materi
     let materiSearch = '';
-    const materiSearchBar = createSearchBar('Cari materi...', q=>{ materiSearch=q; renderMateriList(); });
+    const materiSearchBar = createSearchBar('Cari judul atau isi materi...', q=>{ materiSearch=q.toLowerCase().trim(); renderMateriList(); });
     wrap.appendChild(materiSearchBar);
 
     const list = el('div',{style:{display:'flex',flexDirection:'column',gap:'12px'}});
@@ -1001,7 +1125,20 @@ function renderModul() {
         es.appendChild(el('p',{style:{fontSize:'14px'}},`Belum ada materi.${isAdmin?' Tambahkan materi pertama!':''}`));
         list.appendChild(es); return;
       }
-      const filtered = materis.filter(m=>(m.title||'').toLowerCase().includes(materiSearch));
+      // Search judul + isi konten materi
+      const matKeywords = materiSearch ? materiSearch.split(/\s+/).filter(w=>w.length>1) : [];
+      const filtered = materiSearch
+        ? materis.filter(m=>{
+            const title = (m.title||'').toLowerCase();
+            const body  = (m.content||'').replace(/<[^>]*>/g,'').toLowerCase();
+            return matKeywords.some(kw=>title.includes(kw)||body.includes(kw));
+          }).sort((a,b)=>{
+            // Urutkan: judul match dulu
+            const titleA = matKeywords.some(kw=>(a.title||'').toLowerCase().includes(kw))?1:0;
+            const titleB = matKeywords.some(kw=>(b.title||'').toLowerCase().includes(kw))?1:0;
+            return titleB-titleA;
+          })
+        : materis;
       if(filtered.length===0){ list.appendChild(el('div',{class:'search-no-result'},'Materi tidak ditemukan 🔍')); return; }
       filtered.forEach(m=>{
       const mc = el('div',{class:'card materi-card'});
@@ -1564,14 +1701,27 @@ function renderQuiz(){
 
     // Search bar quiz
     let quizSearch = '';
-    const quizSearchBar = createSearchBar('Cari quiz...', q=>{
-      quizSearch=q;
-      // filter semua kategori
-      allCats.forEach(cat=>{
-        const filtered=(cats[cat]||[]).filter(qz=>qz.title.toLowerCase().includes(quizSearch));
-        cats[cat]=filtered;
+
+    function scoreQuiz(qz, keywords) {
+      let score = 0;
+      const title = (qz.title||'').toLowerCase();
+      const cat   = (qz.category||'').toLowerCase();
+      keywords.forEach(kw=>{
+        if(title.includes(kw)) score+=3;
+        if(cat.includes(kw))   score+=2;
+        // Cari juga ke dalam pertanyaan
+        (qz.questions||[]).forEach(q=>{
+          if((q.text||'').toLowerCase().includes(kw)) score+=1;
+          (q.options||[]).forEach(o=>{
+            if((o||'').toLowerCase().includes(kw)) score+=0.5;
+          });
+        });
       });
-      activeCat=allCats[0];
+      return score;
+    }
+
+    const quizSearchBar = createSearchBar('Cari quiz, topik, atau kata kunci pertanyaan...', q=>{
+      quizSearch = q.toLowerCase().trim();
       renderCatContent();
     });
     wrap.appendChild(quizSearchBar);
@@ -2192,40 +2342,123 @@ function renderAdmin(){
 
   // ── REGISTRY STAF ──
   const regCard = el('div',{class:'card',style:{marginBottom:'20px'}});
-  regCard.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)',marginBottom:'14px'}},'🪪 Registry Staf'));
+  const regHeader = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}});
+  regHeader.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)'}},'🪪 Registry Staf'));
   const regContent = el('div',{});
+  regCard.appendChild(regHeader);
   regCard.appendChild(regContent);
 
-  (async()=>{
+  // Fungsi load & render registry — bisa dipanggil ulang setelah edit
+  async function loadRegistry() {
+    regContent.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:13px;">Memuat...</div>';
     const registry = await fbGet('stafRegistry');
     regContent.innerHTML = '';
     if(!registry || Object.keys(registry).length===0){
       regContent.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',textAlign:'center',padding:'16px 0'}},'Belum ada staf terdaftar.'));
       return;
     }
-    const stafList = Object.values(registry).sort((a,b)=>b.jumlahLogin-a.jumlahLogin);
-    const tbl = document.createElement('table');
-    tbl.style.cssText='width:100%;border-collapse:collapse;font-size:13px;';
-    const thead = tbl.createTHead();
-    const hr = thead.insertRow();
-    ['No','NIK','Tipe','Nama','Cabang','Total Login','Login Terakhir'].forEach(h=>{
-      const th=document.createElement('th');
-      th.textContent=h;
-      th.style.cssText='text-align:left;padding:8px 10px;border-bottom:2px solid var(--green2);color:var(--green5);font-weight:500;font-size:12px;';
-      hr.appendChild(th);
-    });
-    const tbody = tbl.createTBody();
-    stafList.forEach((s,i)=>{
-      const tr=tbody.insertRow(); tr.style.borderBottom='1px solid var(--green1)';
-      const nikShow = (s.nik||'').startsWith('MAGANG_')?'(magang)':(s.nik||'-');
-      [i+1, nikShow, s.tipe||'tetap', s.nama||'-', s.cabang||'-', (s.jumlahLogin||0)+'x', s.terakhirLogin||'-'].forEach(val=>{
-        const td=tr.insertCell(); td.textContent=val;
-        td.style.cssText='padding:8px 10px;color:var(--text2);';
+
+    // Search bar registry
+    let regSearch = '';
+    const regSearchBar = createSearchBar('Cari nama, NIK, atau cabang...', q=>{regSearch=q; renderRegTable(registry);});
+    regContent.appendChild(regSearchBar);
+
+    const tableWrap = el('div',{style:{overflowX:'auto'}});
+    regContent.appendChild(tableWrap);
+
+    function renderRegTable(reg) {
+      tableWrap.innerHTML = '';
+      const entries = Object.entries(reg)
+        .map(([key,s])=>({key,...s}))
+        .filter(s=> !regSearch ||
+          (s.nama||'').toLowerCase().includes(regSearch) ||
+          (s.nik||'').toLowerCase().includes(regSearch) ||
+          (s.cabang||'').toLowerCase().includes(regSearch)
+        )
+        .sort((a,b)=>b.jumlahLogin-a.jumlahLogin);
+
+      if(entries.length===0){
+        tableWrap.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',textAlign:'center',padding:'16px 0'}},'Tidak ditemukan.'));
+        return;
+      }
+
+      const tbl = document.createElement('table');
+      tbl.style.cssText='width:100%;border-collapse:collapse;font-size:13px;';
+      const thead = tbl.createTHead();
+      const hr = thead.insertRow();
+      ['No','NIK','Tipe','Nama','Cabang','Login','Aksi'].forEach(h=>{
+        const th=document.createElement('th');
+        th.textContent=h;
+        th.style.cssText='text-align:left;padding:8px 10px;border-bottom:2px solid var(--green2);color:var(--green5);font-weight:500;font-size:12px;';
+        hr.appendChild(th);
       });
-    });
-    tbl.appendChild(tbody);
-    regContent.appendChild(tbl);
-  })();
+      const tbody = tbl.createTBody();
+      entries.forEach((s,i)=>{
+        const tr=tbody.insertRow(); tr.style.borderBottom='1px solid var(--green1)';
+        const nikShow=(s.nik||'').startsWith('MAGANG_')?'(magang)':(s.nik||'-');
+        [i+1, nikShow, s.tipe||'tetap', s.nama||'-', s.cabang||'-', (s.jumlahLogin||0)+'x'].forEach(val=>{
+          const td=tr.insertCell(); td.textContent=val;
+          td.style.cssText='padding:8px 10px;color:var(--text2);';
+        });
+        // Kolom Aksi — tombol Edit
+        const tdAksi = tr.insertCell();
+        tdAksi.style.cssText='padding:6px 10px;';
+        const editBtn = el('button',{class:'btn-secondary',style:{fontSize:'11px',padding:'4px 10px'},
+          onClick:()=>{
+            let editData = {nama:s.nama||'', cabang:s.cabang||'', tipe:s.tipe||'tetap', nik:s.nik||''};
+            const m = modal([
+              el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'20px',color:'var(--green5)',marginBottom:'14px'}},'✏️ Edit Data Staf'),
+              // Info NIK (readonly)
+              el('div',{style:{background:'var(--green1)',borderRadius:'8px',padding:'10px 14px',marginBottom:'14px',fontSize:'13px',color:'var(--text2)'}},'NIK: ' + nikShow),
+              // Edit Nama
+              el('label',{class:'form-label'},'Nama'),
+              (()=>{ const i=el('input',{type:'text',style:{marginBottom:'12px'}}); i.value=s.nama||''; i.oninput=e=>editData.nama=e.target.value; return i; })(),
+              // Edit Cabang
+              el('label',{class:'form-label'},'Cabang'),
+              (()=>{ const i=el('input',{type:'text',style:{marginBottom:'12px'},placeholder:'misal: amuntai, kapuas...'}); i.value=s.cabang||''; i.oninput=e=>editData.cabang=e.target.value.toLowerCase().trim(); return i; })(),
+              // Edit Tipe
+              el('label',{class:'form-label'},'Tipe'),
+              (()=>{
+                const sel=el('select',{style:{marginBottom:'16px'},onChange:e=>editData.tipe=e.target.value});
+                [['tetap','Staf Tetap/Kontrak'],['training','Staf Training'],['magang','Staf Magang']].forEach(([v,l])=>{
+                  const o=el('option',{value:v},l); if(v===s.tipe)o.selected=true; sel.appendChild(o);
+                });
+                return sel;
+              })(),
+              el('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},
+                // Simpan
+                el('button',{class:'btn-primary',onClick:async()=>{
+                  if(!editData.nama.trim()){ alert('Nama tidak boleh kosong.'); return; }
+                  if(!editData.cabang.trim()){ alert('Cabang tidak boleh kosong.'); return; }
+                  await fbSet('stafRegistry/'+s.key,{
+                    ...s, nama:editData.nama.trim(),
+                    cabang:editData.cabang.trim().toLowerCase(),
+                    tipe:editData.tipe
+                  });
+                  removeModal(m);
+                  await loadRegistry(); // reload tabel
+                }},'✅ Simpan'),
+                // Hapus dari registry
+                el('button',{class:'btn-danger',onClick:async()=>{
+                  if(!confirm(`Hapus data ${s.nama} dari registry? Staf ini bisa daftar ulang saat login.`)) return;
+                  await fbDelete('stafRegistry/'+s.key);
+                  removeModal(m);
+                  await loadRegistry();
+                }},'🗑 Hapus'),
+                el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
+              )
+            ],()=>removeModal(m));
+          }
+        },'✏️ Edit');
+        tdAksi.appendChild(editBtn);
+      });
+      tbl.appendChild(tbody);
+      tableWrap.appendChild(tbl);
+    }
+    renderRegTable(registry);
+  }
+
+  loadRegistry();
   wrap.appendChild(regCard);
 
   // ── RIWAYAT LOGIN ──
