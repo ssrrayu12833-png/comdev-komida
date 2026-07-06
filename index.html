@@ -723,8 +723,6 @@ function renderSidebar() {
   const isAdmin = user && user.role==='comdev komida';
   const navItems = [
     {id:'beranda',icon:'🏠',label:'Beranda'},
-    {id:'modul',icon:'📖',label:'Modul Literasi'},
-    {id:'ruangaman',icon:'💚',label:'Daily Mood Check'},
     {id:'quiz',icon:'🧩',label:'Quiz'},
     {id:'ebook',icon:'📚',label:'E-Book'},
     {id:'profil',icon:'👤',label:'Profil Saya'},
@@ -781,7 +779,7 @@ function toggleSidebar(){
 function renderTopbar() {
   const {page, notifications} = state;
   const isAdmin = state.user && state.user.role==='comdev komida';
-  const labels = {beranda:'🏠 Beranda',modul:'📖 Modul Literasi',ruangaman:'💚 Daily Mood Check',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel',profil:'👤 Profil Saya'};
+  const labels = {beranda:'🏠 Beranda',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel',profil:'👤 Profil Saya'};
   const bar = el('div',{id:'topbar'});
   const left = el('div',{style:{display:'flex',alignItems:'center',gap:'10px',flex:'1'}});
   left.appendChild(el('button',{id:'hamburger',onClick:toggleSidebar},'☰'));
@@ -815,26 +813,6 @@ function renderTopbar() {
     const keywords = q.split(/\s+/).filter(w=>w.length>1);
     if(keywords.length===0){ keywords.push(q); }
     const results = [];
-
-    // Cari materi
-    const allMods2 = state.data.modules||{};
-    Object.entries(allMods2).forEach(([modName,mod])=>{
-      Object.entries(mod.subModuls||{}).forEach(([subName,sub])=>{
-        (sub.materis||[]).forEach(m=>{
-          const title = (m.title||'').toLowerCase();
-          const body  = (m.content||'').replace(/<[^>]*>/g,'').toLowerCase();
-          let score=0;
-          keywords.forEach(kw=>{ if(title.includes(kw))score+=3; if(body.includes(kw))score+=1; });
-          if(score>0) results.push({type:'materi',icon:MODULE_ICONS[modName]||'📖',
-            title:m.title,sub:`${modName} › ${subName}`,
-            snippet:(m.content||'').replace(/<[^>]*>/g,'').slice(0,80),
-            score,onClick:()=>{
-              gsInput.value=''; gsResults.style.display='none';
-              setState({page:'modul',activeModule:modName,activeSub:subName,activeMateri:m,modulView:'materiDetail'});
-            }});
-        });
-      });
-    });
 
     // Cari quiz
     (state.data.quizzes||[]).forEach(qz=>{
@@ -875,7 +853,7 @@ function renderTopbar() {
     }
 
     // Tampilkan per tipe
-    const sections = [{key:'materi',label:'📖 Materi'},{key:'quiz',label:'🧩 Quiz'},{key:'ebook',label:'📚 E-Book'}];
+    const sections = [{key:'quiz',label:'🧩 Quiz'},{key:'ebook',label:'📚 E-Book'}];
     sections.forEach(sec=>{
       const items = results.filter(r=>r.type===sec.key).slice(0,4);
       if(items.length===0) return;
@@ -964,48 +942,6 @@ function renderBeranda() {
   card2.appendChild(tags);
   wrap.appendChild(card2);
 
-
-  // ── REKOMENDASI ARTIKEL HARI INI ──
-  const rekoCard = el('div',{class:'card',style:{marginTop:'20px',background:'linear-gradient(135deg,white,var(--green1))'}});
-  rekoCard.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'6px'}},'📚 Rekomendasi Hari Ini'));
-  rekoCard.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'16px'}},'Materi pilihan untukmu hari ini'));
-  const rekoContent2 = el('div',{});
-  rekoCard.appendChild(rekoContent2);
-  (async()=>{
-    const allMods2 = state.data.modules || {};
-    const allMateris2 = [];
-    Object.entries(allMods2).forEach(([modName,mod])=>{
-      Object.entries(mod.subModuls||{}).forEach(([subName,sub])=>{
-        (sub.materis||[]).forEach(m=>{ allMateris2.push({...m,modName,subName}); });
-      });
-    });
-    if(allMateris2.length===0){
-      rekoContent2.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text3)',textAlign:'center',padding:'12px 0'}},'Tambah materi dulu untuk mendapat rekomendasi.'));
-      return;
-    }
-    const todayNum = new Date().getFullYear()*10000+(new Date().getMonth()+1)*100+new Date().getDate();
-    const picked=[]; const usedIdx=new Set();
-    for(let i=0;i<Math.min(3,allMateris2.length);i++){
-      let idx=(todayNum*(i+7)+i*31)%allMateris2.length;
-      while(usedIdx.has(idx)) idx=(idx+1)%allMateris2.length;
-      usedIdx.add(idx); picked.push(allMateris2[idx]);
-    }
-    picked.forEach(m=>{
-      const rc=el('div',{style:{display:'flex',alignItems:'center',gap:'12px',padding:'10px 0',borderBottom:'1px solid var(--green2)',cursor:'pointer'},
-        onClick:()=>setState({page:'modul',activeModule:m.modName,activeSub:m.subName,activeMateri:m,modulView:'materiDetail'})});
-      const icon=el('div',{style:{width:'40px',height:'40px',borderRadius:'10px',flexShrink:'0',
-        background:getModColor(m.modName),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}},
-        MODULE_ICONS[m.modName]||'📖');
-      rc.appendChild(icon);
-      const txt=el('div',{style:{flex:'1'}});
-      txt.appendChild(el('div',{style:{fontSize:'13px',fontWeight:'500',color:'var(--text1)',marginBottom:'2px',lineHeight:'1.4'}},m.title));
-      txt.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)'}},`${m.modName} › ${m.subName}`));
-      rc.appendChild(txt);
-      rc.appendChild(el('span',{style:{fontSize:'12px',color:'var(--green5)',flexShrink:'0'}},'→'));
-      rekoContent2.appendChild(rc);
-    });
-  })();
-  wrap.appendChild(rekoCard);
 
   return wrap;
 }
@@ -2619,6 +2555,69 @@ const MOODS = [
 // Sistem: mood val → array judul artikel (diisi admin di Firebase)
 // Key di Firebase: moodReko/5, moodReko/4, dst
 
+function getTodayMoodKey(){
+  const t = new Date();
+  return 'mood_' + t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+}
+
+// ─── MOOD GATE (wajib diisi Staf/Admin sebelum lanjut ke menu) ───────────────
+function renderMoodGate(onDone){
+  const wrap = el('div',{style:{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--cream)',padding:'20px'}});
+  const card = el('div',{class:'card',style:{maxWidth:'440px',width:'100%',textAlign:'center',padding:'32px 24px'}});
+  card.appendChild(el('div',{style:{fontSize:'40px',marginBottom:'10px'}},'💚'));
+  card.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'24px',color:'var(--green5)',marginBottom:'6px'}},'Daily Mood Check'));
+  card.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'20px',lineHeight:'1.7'}},'Sebelum lanjut, yuk isi dulu bagaimana perasaanmu hari ini.'));
+
+  let selectedMood = null;
+  const moodBtns = {};
+  const moodGrid = el('div',{class:'mood-grid'});
+  MOODS.forEach(m=>{
+    const btn = el('div',{class:'mood-btn', onClick:()=>{
+      selectedMood = m;
+      Object.values(moodBtns).forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+    }});
+    btn.appendChild(el('div',{class:'mood-emoji'},m.emoji));
+    btn.appendChild(el('div',{class:'mood-label'},m.label));
+    moodBtns[m.val] = btn;
+    moodGrid.appendChild(btn);
+  });
+  card.appendChild(moodGrid);
+
+  const errMsg = el('div',{style:{fontSize:'12px',color:'#c0392b',minHeight:'16px',margin:'8px 0 0'}});
+  card.appendChild(errMsg);
+
+  const submitBtn = el('button',{class:'btn-primary',style:{width:'100%',padding:'12px',marginTop:'8px'},
+    onClick: async()=>{
+      if(!selectedMood){ errMsg.textContent='Pilih mood dulu ya 💚'; return; }
+      errMsg.textContent='';
+      submitBtn.textContent = 'Menyimpan...';
+      submitBtn.disabled = true;
+      try{
+        const todayKey = getTodayMoodKey();
+        const cabang = state.user.cabang || 'tidak diketahui';
+        const entry = {
+          mood: selectedMood.val, emoji: selectedMood.emoji, label: selectedMood.label,
+          cabang, hari: todayKey.replace('mood_',''), waktu: new Date().toLocaleString('id-ID'),
+        };
+        await fbPush('dailymood', entry);
+        localStorage.setItem(todayKey, String(selectedMood.val));
+        onDone();
+      } catch(e){
+        errMsg.textContent = 'Gagal menyimpan, coba lagi.';
+        submitBtn.textContent = 'Simpan & Lanjutkan →';
+        submitBtn.disabled = false;
+      }
+    }
+  }, 'Simpan & Lanjutkan →');
+  card.appendChild(submitBtn);
+
+  card.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'14px'}},'Check-in ini khusus Staf & Admin KOMIDA, sekali per hari.'));
+
+  wrap.appendChild(card);
+  return wrap;
+}
+
 function renderRuangAman() {
   const isAdmin  = state.user && state.user.role === 'comdev komida';
   const isStaf   = state.user && state.user.role === 'staf komida';
@@ -3398,6 +3397,13 @@ function render(){
     return;
   }
 
+  // Wajib isi Daily Mood Check dulu (khusus Staf & Admin) sebelum bisa lanjut ke menu lain
+  const isStafOrAdmin = state.user.role==='staf komida' || state.user.role==='comdev komida';
+  if(isStafOrAdmin && !localStorage.getItem(getTodayMoodKey())){
+    root.appendChild(renderMoodGate(()=>render()));
+    return;
+  }
+
   const app = el('div',{id:'app'});
   app.appendChild(renderSidebar());
 
@@ -3412,8 +3418,6 @@ function render(){
   let pageEl;
   switch(state.page){
     case 'beranda': pageEl=renderBeranda(); break;
-    case 'modul':   pageEl=renderModul();  break;
-    case 'ruangaman': pageEl=renderRuangAman(); break;
     case 'quiz':    pageEl=renderQuiz();   break;
     case 'ebook':   pageEl=renderEbook();  break;
     case 'profil':  pageEl=renderProfil(); break;
