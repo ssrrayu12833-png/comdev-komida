@@ -324,6 +324,22 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 .global-result-snippet{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4;}
 .global-result-section{padding:6px 14px;font-size:10px;color:var(--green5);font-weight:600;letter-spacing:.5px;text-transform:uppercase;background:var(--green1);}
 @media(max-width:768px){.global-search-wrap{display:none;}}
+
+/* Global search */
+.global-search-wrap{position:relative;flex:1;max-width:320px;}
+.global-search-input{width:100%;padding:7px 14px 7px 34px;border:1.5px solid var(--green2);border-radius:20px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;background:var(--green1);color:var(--text1);transition:all .2s;}
+.global-search-input:focus{border-color:var(--green4);background:white;box-shadow:0 2px 12px rgba(106,179,106,.15);}
+.global-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text3);}
+.global-search-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:white;border:1px solid var(--green2);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:500;max-height:400px;overflow-y:auto;}
+.global-search-section{padding:8px 0;}
+.global-search-label{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;padding:4px 14px 2px;}
+.global-search-item{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .15s;}
+.global-search-item:hover{background:var(--green1);}
+.global-search-item-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.global-search-item-title{font-size:13px;color:var(--text1);font-weight:500;line-height:1.3;}
+.global-search-item-sub{font-size:11px;color:var(--text3);}
+.global-search-empty{padding:20px;text-align:center;font-size:13px;color:var(--text3);}
+@media(max-width:768px){.global-search-wrap{max-width:160px;}.global-search-input{font-size:12px;padding:6px 10px 6px 28px;}}
 </style>
 </head>
 <body>
@@ -544,20 +560,37 @@ async function initData() {
     state.data.blogs   = blogs   ? Object.entries(blogs).map(([k,v])=>({...v,_key:k}))   : [];
     state.data.quizzes = quizzes ? Object.entries(quizzes).map(([k,v])=>({...v,_key:k})) : [];
     state.data.ebooks  = ebooks  ? Object.entries(ebooks).map(([k,v])=>({...v,_key:k}))  : [];
-    // Hanya pakai data Firebase jika ada — jangan overwrite dengan default
+    // Hanya pakai data Firebase jika ada
     if(modules && typeof modules === 'object' && Object.keys(modules).length > 0) {
-      // Kembalikan key yang punya _ menjadi nama aslinya (match dengan MODULES)
       const restored = {};
       Object.entries(modules).forEach(([k,v])=>{
-        // Cari nama asli di MODULES yang match setelah di-encode
         const original = MODULES.find(m=>m.replace(/[.#$\[\]/]/g,'_')===k) || k;
         restored[original] = v;
       });
       state.data.modules = restored;
+      // ✅ Backup ke localStorage setiap kali berhasil load dari Firebase
+      try { localStorage.setItem('modules_backup', JSON.stringify(restored)); } catch(e){}
     } else {
-      // Firebase kosong — inisialisasi modul default
-      MODULES.forEach(m=>{ state.data.modules[m]={subModuls:{}}; });
-      saveModules();
+      // Firebase kosong — coba ambil dari backup localStorage dulu
+      const backup = localStorage.getItem('modules_backup');
+      if(backup) {
+        try {
+          const parsed = JSON.parse(backup);
+          if(parsed && Object.keys(parsed).length > 0) {
+            state.data.modules = parsed;
+            console.warn('Modules loaded from local backup — Firebase was empty');
+            // Restore ke Firebase dari backup
+            saveModules();
+          }
+        } catch(e) {}
+      }
+      // Kalau backup juga kosong — inisialisasi default TANPA saveModules
+      // (jangan overwrite Firebase yang mungkin sedang loading)
+      if(Object.keys(state.data.modules).length === 0) {
+        MODULES.forEach(m=>{ state.data.modules[m]={subModuls:{}}; });
+        // Hanya save kalau Firebase benar-benar null (bukan error sementara)
+        if(modules === null) saveModules();
+      }
     }
     state.forum        = forum   || {};
     const logArr = loginlog ? Object.values(loginlog) : [];
@@ -569,6 +602,10 @@ async function initData() {
   state.loading = false; render();
 }
 async function saveModules() {
+  if(Object.keys(state.data.modules).length === 0) {
+    console.warn('saveModules: modules kosong, dibatalkan untuk mencegah data hilang');
+    return;
+  }
   // Encode nama modul & sub modul yang jadi key Firebase
   const safeMods = {};
   Object.entries(state.data.modules).forEach(([k,v])=>{
@@ -581,6 +618,8 @@ async function saveModules() {
     safeMods[safeK] = {...v, subModuls: safeSubs};
   });
   await fbSet('modules', safeMods);
+  // Backup ke localStorage setelah berhasil save
+  try { localStorage.setItem('modules_backup', JSON.stringify(state.data.modules)); } catch(e){}
 }
 function showSapaan(user) {
   // Hapus toast lama kalau ada
@@ -1733,13 +1772,40 @@ function renderQuiz(){
 
     function renderCatContent() {
       catContent.innerHTML = '';
+
+      // Kalau ada search — tampilkan hasil dari semua kategori, sorted by score
+      if(quizSearch.length > 1) {
+        const keywords = quizSearch.split(/\s+/).filter(w=>w.length>1);
+        const allQuizzes = quizzes.filter(qz=>{
+          return scoreQuiz(qz, keywords) > 0;
+        }).sort((a,b)=>scoreQuiz(b,keywords)-scoreQuiz(a,keywords));
+
+        if(allQuizzes.length===0){
+          catContent.appendChild(el('div',{class:'search-no-result'},'Quiz tidak ditemukan 🔍'));
+          return;
+        }
+        catContent.appendChild(el('div',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'12px'}},
+          `🧩 ${allQuizzes.length} quiz ditemukan:`));
+        const grid = el('div',{class:'quiz-grid'});
+        allQuizzes.forEach(qz=>grid.appendChild(makeQuizCard(qz)));
+        catContent.appendChild(grid);
+        return;
+      }
+
       const grid = el('div',{class:'quiz-grid'});
       (cats[activeCat]||[]).forEach(qz=>{
+        grid.appendChild(makeQuizCard(qz));
+      });
+      catContent.appendChild(grid);
+    }
+
+    function makeQuizCard(qz) {
         const qc = el('div',{class:'card quiz-card'});
         const qcTop = el('div',{style:{cursor:'pointer'},onClick:()=>setState({activeQuiz:qz,quizView:'take',quizSubmitted:false,quizAnswers:{},quizScore:null})});
         qcTop.appendChild(el('div',{style:{fontSize:'28px',marginBottom:'8px'}},'🧩'));
+        if(qz.category) qcTop.appendChild(el('span',{class:'tag',style:{marginBottom:'6px',display:'inline-block'}},qz.category));
         qcTop.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'16px',color:'var(--text1)',marginBottom:'4px'}},qz.title));
-        qcTop.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)'}},`${qz.questions.length} pertanyaan · ${qz.date}`));
+        qcTop.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)'}},`${(qz.questions||[]).length} pertanyaan · ${qz.date||''}`));
         qcTop.appendChild(el('div',{style:{marginTop:'12px',fontSize:'12px',color:'var(--green5)'}},'Mulai Quiz →'));
         qc.appendChild(qcTop);
         if(isAdmin){
@@ -1770,9 +1836,7 @@ function renderQuiz(){
           }},'🗑 Hapus'));
           qc.appendChild(qca);
         }
-        grid.appendChild(qc);
-      });
-      catContent.appendChild(grid);
+        return qc;
     }
 
     allCats.forEach(cat => {
