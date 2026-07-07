@@ -216,6 +216,13 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 .editor-content ul{padding-left:20px;margin:4px 0;}
 .editor-content ol{padding-left:20px;margin:4px 0;}
 .editor-content h3{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--green5);margin:8px 0 4px;}
+.editor-content h2{font-family:'Cormorant Garamond',serif;font-size:23px;color:var(--green5);margin:10px 0 6px;}
+.editor-content blockquote{border-left:3px solid var(--green4);margin:8px 0;padding:4px 14px;color:var(--text2);font-style:italic;background:var(--green1);border-radius:0 8px 8px 0;}
+.editor-content img{max-width:100%;border-radius:10px;margin:10px 0;display:block;}
+.editor-content a{color:var(--green5);text-decoration:underline;}
+.materi-rendered-content h2{font-family:'Cormorant Garamond',serif;font-size:23px;color:var(--green5);margin:14px 0 6px;}
+.materi-rendered-content img{max-width:100%;border-radius:10px;margin:12px 0;display:block;}
+.materi-rendered-content a{color:var(--green5);text-decoration:underline;}
 /* Quiz kategori tabs */
 .quiz-cat-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}
 .quiz-cat-tab{padding:6px 16px;border-radius:20px;border:1.5px solid var(--green2);background:white;color:var(--text2);font-size:13px;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;}
@@ -349,6 +356,32 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 <script>
 // ─── PALETTE & DATA ──────────────────────────────────────────────────────────
 // ─── RICH TEXT EDITOR ────────────────────────────────────────────────────────
+// Baca file foto dari perangkat lalu kompres (resize + kompres JPEG) supaya ukurannya wajar saat disimpan
+function readImageCompressed(file, maxDim, quality){
+  maxDim = maxDim || 1280; quality = quality || 0.75;
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(new Error('Gagal membaca file foto'));
+    reader.onload = ev=>{
+      const img = new Image();
+      img.onerror = ()=>reject(new Error('Gagal memuat foto'));
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w>maxDim || h>maxDim){
+          if(w>h){ h = Math.round(h*maxDim/w); w = maxDim; }
+          else { w = Math.round(w*maxDim/h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function createEditor(placeholder, onChange) {
   const wrap = document.createElement('div');
   wrap.style.marginBottom = '12px';
@@ -356,16 +389,58 @@ function createEditor(placeholder, onChange) {
   // Toolbar
   const tb = el('div', {class:'editor-toolbar'});
   const buttons = [
-    {cmd:'bold',      icon:'<b>B</b>',    title:'Bold'},
-    {cmd:'italic',    icon:'<i>I</i>',    title:'Italic'},
-    {cmd:'underline', icon:'<u>U</u>',    title:'Underline'},
+    {cmd:'undo',      icon:'↶',           title:'Urungkan'},
+    {cmd:'redo',      icon:'↷',           title:'Ulangi'},
     {cmd:'sep'},
-    {cmd:'insertUnorderedList', icon:'• List', title:'Bullet List'},
-    {cmd:'insertOrderedList',   icon:'1. List', title:'Numbered List'},
+    {cmd:'h2',        icon:'Judul 1',     title:'Judul Besar'},
+    {cmd:'h3',        icon:'Judul 2',     title:'Judul Kecil'},
+    {cmd:'p',         icon:'Teks',        title:'Paragraf Biasa'},
     {cmd:'sep'},
-    {cmd:'h3',        icon:'Judul',       title:'Heading'},
+    {cmd:'bold',      icon:'<b>B</b>',    title:'Tebal'},
+    {cmd:'italic',    icon:'<i>I</i>',    title:'Miring'},
+    {cmd:'underline', icon:'<u>U</u>',    title:'Garis Bawah'},
+    {cmd:'strikeThrough', icon:'<s>S</s>',title:'Coret'},
+    {cmd:'sep'},
+    {cmd:'justifyLeft',   icon:'⇤',       title:'Rata Kiri'},
+    {cmd:'justifyCenter', icon:'≡',       title:'Rata Tengah'},
+    {cmd:'justifyRight',  icon:'⇥',       title:'Rata Kanan'},
+    {cmd:'sep'},
+    {cmd:'insertUnorderedList', icon:'• List', title:'Daftar Poin'},
+    {cmd:'insertOrderedList',   icon:'1. List', title:'Daftar Angka'},
+    {cmd:'blockquote', icon:'❝ Kutipan', title:'Kutipan'},
+    {cmd:'sep'},
+    {cmd:'link',   icon:'🔗 Link',  title:'Sisipkan Tautan'},
+    {cmd:'image',  icon:'🖼️ Foto', title:'Sisipkan Foto'},
+    {cmd:'sep'},
     {cmd:'removeFormat', icon:'✕ Format', title:'Hapus Format'},
   ];
+
+  // Input file tersembunyi untuk sisipkan foto ke dalam isi artikel
+  const imgFileInput = document.createElement('input');
+  imgFileInput.type = 'file'; imgFileInput.accept = 'image/*'; imgFileInput.style.display = 'none';
+  let savedRange = null;
+  imgFileInput.onchange = async e=>{
+    const file = e.target.files[0];
+    imgFileInput.value = '';
+    if(!file) return;
+    if(file.size > 8*1024*1024){ alert('Ukuran foto maksimal 8MB ya.'); return; }
+    try{
+      const dataUrl = await readImageCompressed(file, 1000, 0.75);
+      editor.focus();
+      if(savedRange){
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+      document.execCommand('insertHTML', false, `<img src="${dataUrl}" style="max-width:100%;border-radius:10px;margin:10px 0;display:block;">`);
+      onChange(editor.innerHTML);
+    }catch(err){
+      console.error(err);
+      alert('Gagal memuat foto, coba foto lain ya.');
+    }
+  };
+  wrap.appendChild(imgFileInput);
+
   buttons.forEach(b => {
     if(b.cmd === 'sep') {
       const sep = document.createElement('span');
@@ -379,8 +454,20 @@ function createEditor(placeholder, onChange) {
     btn.type = 'button';
     btn.onmousedown = (e) => {
       e.preventDefault();
-      if(b.cmd === 'h3') {
-        document.execCommand('formatBlock', false, 'h3');
+      if(b.cmd === 'h2' || b.cmd === 'h3'){
+        document.execCommand('formatBlock', false, b.cmd);
+      } else if(b.cmd === 'p'){
+        document.execCommand('formatBlock', false, 'p');
+      } else if(b.cmd === 'blockquote'){
+        document.execCommand('formatBlock', false, 'blockquote');
+      } else if(b.cmd === 'link'){
+        const url = prompt('Masukkan URL tautan:', 'https://');
+        if(url) document.execCommand('createLink', false, url);
+      } else if(b.cmd === 'image'){
+        const sel = window.getSelection();
+        savedRange = sel.rangeCount ? sel.getRangeAt(0) : null;
+        imgFileInput.click();
+        return; // fokus & onChange ditangani setelah file dipilih
       } else {
         document.execCommand(b.cmd, false, null);
       }
@@ -535,7 +622,7 @@ const state = {
     return savedUser;
   })(),
   page: 'beranda',
-  data: {modules:{},blogs:[],quizzes:[],ebooks:[]},
+  data: {modules:{},blogs:[],quizzes:[],ebooks:[],pemberdayaArtikel:[]},
   notifications: [],
   counter: 0,
   loginLog: [],
@@ -544,6 +631,7 @@ const state = {
   blogView: 'list', activePost: null,
   ruangAmanView: 'list', activeCerita: null,
   quizView: 'list', activeQuiz: null, quizAnswers: {}, quizSubmitted: false, quizScore: null,
+  pemberdayaView: 'list', activeArtikel: null,
   forum: {},
   quoteIdx: new Date().getDay() % QUOTES.length,
 };
@@ -552,15 +640,16 @@ const state = {
 async function initData() {
   state.loading = true; render();
   try {
-    const [blogs, quizzes, ebooks, modules, forum, loginlog, hutan] = await Promise.all([
+    const [blogs, quizzes, ebooks, modules, forum, loginlog, hutan, pemberdayaArtikel] = await Promise.all([
       fbGet('blogs'), fbGet('quizzes'), fbGet('ebooks'),
-      fbGet('modules'), fbGet('forum'), fbGet('loginlog'), fbGet('hutan'),
+      fbGet('modules'), fbGet('forum'), fbGet('loginlog'), fbGet('hutan'), fbGet('pemberdayaArtikel'),
     ]);
     // blogs: {id: {...}, id2: {...}}
     state.data.blogs   = blogs   ? Object.entries(blogs).map(([k,v])=>({...v,_key:k}))   : [];
     state.data.quizzes = quizzes ? Object.entries(quizzes).map(([k,v])=>({...v,_key:k})) : [];
     state.data.ebooks  = ebooks  ? Object.entries(ebooks).map(([k,v])=>({...v,_key:k}))  : [];
     state.data.hutan   = hutan   || {};
+    state.data.pemberdayaArtikel = pemberdayaArtikel ? Object.entries(pemberdayaArtikel).map(([k,v])=>({...v,_key:k})) : [];
     // Hanya pakai data Firebase jika ada
     if(modules && typeof modules === 'object' && Object.keys(modules).length > 0) {
       const restored = {};
@@ -725,6 +814,7 @@ function renderSidebar() {
   const navItems = [
     {id:'beranda',icon:'🏠',label:'Beranda'},
     {id:'hutan',icon:'🌳',label:'Hutan Pemberdayaan'},
+    {id:'pemberdaya',icon:'📰',label:'Sudut Pemberdaya'},
     {id:'quiz',icon:'🧩',label:'Quiz'},
     {id:'ebook',icon:'📚',label:'E-Book'},
     {id:'profil',icon:'👤',label:'Profil Saya'},
@@ -748,7 +838,7 @@ function renderSidebar() {
   const nav = el('div',{class:'nav-area'});
   navItems.forEach(n=>{
     const btn = el('button',{class:'nav-btn'+(page===n.id?' active':''), onClick:()=>{
-      setState({page:n.id,modulView:'list',ruangAmanView:'list',quizView:'list'});
+      setState({page:n.id,modulView:'list',ruangAmanView:'list',quizView:'list',pemberdayaView:'list'});
       const sb=document.getElementById('sidebar'); const ov=document.getElementById('sidebar-overlay');
       if(sb) sb.classList.remove('open'); if(ov) ov.classList.remove('open');
     }},
@@ -894,7 +984,7 @@ function renderBeranda() {
   const wrap = el('div',{class:'page-pad fade-in',style:{maxWidth:'800px'}});
 
   wrap.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'32px',color:'var(--green5)',marginBottom:'4px'}},'Selamat Datang 🌿'));
-  wrap.appendChild(el('p',{style:{color:'var(--text3)',fontSize:'14px',marginBottom:'32px'}},'Pusat Edukasi Staf & Anggota KOMIDA, belajar sederhana untuk berkembang bersama.'));
+  wrap.appendChild(el('p',{style:{color:'var(--text3)',fontSize:'14px',marginBottom:'32px'}},'Menumbuhkan Kepedulian, Menguatkan Pemberdayaan'));
 
   // Quote box
   const qbox = el('div',{class:'quote-box'});
@@ -1576,6 +1666,183 @@ function renderBlog(){
           removeModal(m);
           setState({});
           fbPush('blogs', post);
+        }},'Publikasikan'),
+        el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
+      )
+    ], ()=>removeModal(m));
+  }
+  return wrap;
+}
+
+// ─── PAGE: SUDUT PEMBERDAYA ───────────────────────────────────────────────────
+function renderSudutPemberdaya(){
+  const {pemberdayaView, activeArtikel, data} = state;
+  const isAdmin = state.user && state.user.role==='comdev komida';
+  const posts = data.pemberdayaArtikel||[];
+  const cats = ["Kondisi Kemiskinan","Kisah Perubahan","Program & Solusi","Data & Kebijakan"];
+
+  if(pemberdayaView==='detail' && activeArtikel){
+    const wrap = el('div',{class:'page-pad fade-in',style:{maxWidth:'700px'}});
+    wrap.appendChild(el('button',{class:'back-btn',style:{marginBottom:'24px'},onClick:()=>setState({pemberdayaView:'list'})},'← Kembali'));
+    const c = el('div',{class:'card'});
+    if(activeArtikel.imageUrl) {
+      const img = document.createElement('img');
+      img.src = activeArtikel.imageUrl; img.className = 'blog-cover-img-detail';
+      img.onerror = ()=>img.style.display='none';
+      c.appendChild(img);
+    }
+    c.appendChild(el('span',{class:'tag',style:{marginBottom:'12px',display:'inline-block'}},activeArtikel.category));
+    c.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'28px',color:'var(--text1)',marginBottom:'8px',lineHeight:'1.3'}},activeArtikel.title));
+    c.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'20px'}},`📅 ${activeArtikel.date} · ✍️ ${activeArtikel.penulis||'Tim Comdev'}`));
+    const ct = el('div',{class:'materi-rendered-content'});
+    ct.innerHTML = activeArtikel.content || '';
+    c.appendChild(ct);
+    wrap.appendChild(c);
+    return wrap;
+  }
+
+  const wrap = el('div',{class:'page-pad fade-in'});
+  const hdr = el('div',{class:'page-header'});
+  const ht = el('div');
+  ht.appendChild(el('div',{class:'page-title'},'📰 Sudut Pemberdaya'));
+  ht.appendChild(el('p',{class:'page-sub'},'Tulisan tentang kemiskinan, kisah perubahan, dan langkah pemberdayaan'));
+  hdr.appendChild(ht);
+  if(isAdmin) hdr.appendChild(el('button',{class:'btn-primary',onClick:showArtikelForm},'+ Tulis Artikel'));
+  wrap.appendChild(hdr);
+
+  if(posts.length===0){
+    const es = el('div',{class:'empty-state'});
+    es.appendChild(el('div',{class:'empty-icon'},'📰'));
+    es.appendChild(el('p',{},`Belum ada artikel.${isAdmin?' Tulis artikel pertama!':''}`));
+    wrap.appendChild(es);
+  }
+  const grid = el('div',{class:'blog-grid'});
+  posts.forEach(p=>{
+    const bc = el('div',{class:'card blog-card'});
+    const bcTop = el('div',{onClick:()=>setState({activeArtikel:p,pemberdayaView:'detail'}),style:{cursor:'pointer'}});
+    if(p.imageUrl) {
+      const img = document.createElement('img');
+      img.src = p.imageUrl; img.className = 'blog-cover-img';
+      img.onerror = ()=>img.style.display='none';
+      bcTop.appendChild(img);
+    }
+    bcTop.appendChild(el('span',{class:'tag',style:{marginBottom:'10px',display:'inline-block'}},p.category));
+    bcTop.appendChild(el('div',{class:'blog-title'},p.title));
+    bcTop.appendChild(el('div',{class:'blog-date'},`📅 ${p.date}`));
+    const excerpt = (p.content||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim();
+    bcTop.appendChild(el('div',{class:'blog-excerpt'},excerpt.slice(0,120)+(excerpt.length>120?'...':'')));
+    bcTop.appendChild(el('div',{class:'read-more'},'Baca selengkapnya →'));
+    bc.appendChild(bcTop);
+    if(isAdmin){
+      const bca = el('div',{class:'card-actions'});
+      bca.appendChild(el('button',{class:'btn-secondary',style:{fontSize:'12px'},onClick:(e)=>{
+        e.stopPropagation();
+        let editForm = {title:p.title, category:p.category, content:p.content, imageUrl:p.imageUrl||''};
+        const editorEl = createEditor('Tulis isi artikel...', v => editForm.content = v);
+        let coverPreview;
+        const m = modal([
+          el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Edit Artikel'),
+          (() => { const i = el('input',{type:'text',style:{marginBottom:'12px'}}); i.value=p.title; i.oninput=e=>editForm.title=e.target.value; return i; })(),
+          (() => { const s = el('select',{style:{marginBottom:'12px'},onChange:e=>editForm.category=e.target.value}); cats.forEach(c=>{const o=el('option',{value:c},c); if(c===p.category)o.selected=true; s.appendChild(o);}); return s; })(),
+          buatUploadFoto(editForm.imageUrl, url=>{ editForm.imageUrl=url; }, (img)=>{coverPreview=img;}),
+          (() => { editorEl.style.marginBottom='16px'; editorEl.setValue(p.content); return editorEl; })(),
+          el('div',{style:{display:'flex',gap:'10px'}},
+            el('button',{class:'btn-primary',onClick: async (e)=>{
+              if(!editForm.title.trim()) return;
+              const btn = e.target;
+              const updated = {...p, ...editForm};
+              btn.disabled = true; btn.textContent = 'Menyimpan...';
+              const result = p._key ? await fbSet('pemberdayaArtikel/'+p._key, updated) : updated;
+              if(result===null){
+                btn.disabled = false; btn.textContent = 'Simpan';
+                alert('⚠️ Gagal menyimpan perubahan ke server (kemungkinan koneksi internet bermasalah). Coba tekan Simpan lagi.');
+                return;
+              }
+              state.data.pemberdayaArtikel = state.data.pemberdayaArtikel.map(a=>a.id===p.id?updated:a);
+              removeModal(m); setState({});
+            }},'Simpan'),
+            el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
+          )
+        ], ()=>removeModal(m));
+      }},'✏️ Edit'));
+      bca.appendChild(el('button',{class:'btn-danger',onClick:(e)=>{
+        e.stopPropagation();
+        if(!confirm(`Hapus artikel "${p.title}"?`)) return;
+        state.data.pemberdayaArtikel = (state.data.pemberdayaArtikel||[]).filter(a=>a.id!==p.id);
+        if(p._key) fbDelete('pemberdayaArtikel/'+p._key);
+        setState({});
+      }},'🗑 Hapus'));
+      bc.appendChild(bca);
+    }
+    grid.appendChild(bc);
+  });
+  wrap.appendChild(grid);
+
+  // Membuat komponen upload foto sampul: pilih file dari perangkat, dikompres, lalu disimpan sebagai base64
+  function buatUploadFoto(initialUrl, onChangeUrl, onImgRef){
+    const box = el('div',{style:{marginBottom:'4px'}});
+    const preview = el('div',{style:{
+      width:'100%', height: initialUrl? '140px':'0', overflow:'hidden', borderRadius:'10px',
+      marginBottom: initialUrl?'8px':'0', transition:'all .2s', background:'var(--green1)',
+    }});
+    if(initialUrl){
+      const img = document.createElement('img');
+      img.src = initialUrl; img.style.cssText='width:100%;height:100%;object-fit:cover;';
+      preview.appendChild(img);
+      if(onImgRef) onImgRef(img);
+    }
+    const fileInput = el('input',{type:'file',accept:'image/*',style:{marginBottom:'4px'}});
+    fileInput.onchange = async e=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      if(file.size > 8*1024*1024){ alert('Ukuran foto maksimal 8MB ya.'); return; }
+      try{
+        const dataUrl = await readImageCompressed(file, 1000, 0.75);
+        onChangeUrl(dataUrl);
+        preview.innerHTML = '';
+        preview.style.height = '140px'; preview.style.marginBottom = '8px';
+        const img = document.createElement('img');
+        img.src = dataUrl; img.style.cssText='width:100%;height:100%;object-fit:cover;';
+        preview.appendChild(img);
+      }catch(err){
+        console.error(err);
+        alert('Gagal memuat foto, coba foto lain ya.');
+      }
+    };
+    box.appendChild(preview);
+    box.appendChild(fileInput);
+    box.appendChild(el('div',{class:'img-hint'},'💡 Unggah foto sampul artikel langsung dari perangkatmu (foto otomatis dikompres)'));
+    return box;
+  }
+
+  function showArtikelForm(){
+    let form = {title:'',category:cats[0],content:'',imageUrl:''};
+    const editorEl = createEditor('Tulis isi artikel tentang kemiskinan, kisah perubahan, atau program pemberdayaan...', v => form.content = v);
+    const m = modal([
+      el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'22px',color:'var(--green5)',marginBottom:'16px'}},'Tulis Artikel Baru'),
+      el('input',{type:'text',placeholder:'Judul artikel...',style:{marginBottom:'12px'},onInput:e=>form.title=e.target.value}),
+      (() => {
+        const s = el('select',{style:{marginBottom:'12px'},onChange:e=>form.category=e.target.value});
+        cats.forEach(c=>{const o=el('option',{value:c},c);s.appendChild(o);}); return s;
+      })(),
+      buatUploadFoto('', url=>{ form.imageUrl=url; }),
+      (() => { editorEl.style.marginBottom='16px'; return editorEl; })(),
+      el('div',{style:{display:'flex',gap:'10px'}},
+        el('button',{class:'btn-primary',onClick: async (e)=>{
+          if(!form.title.trim()||!form.content.trim())return;
+          const btn = e.target;
+          const post={id:String(Date.now()),...form,date:new Date().toLocaleDateString('id-ID'),penulis:(state.user&&state.user.name)||'Tim Comdev'};
+          btn.disabled = true; btn.textContent = 'Menyimpan...';
+          const result = await fbPush('pemberdayaArtikel', post);
+          if(result && result.name){
+            post._key = result.name;
+            state.data.pemberdayaArtikel = [post, ...(state.data.pemberdayaArtikel||[])];
+            removeModal(m);
+            setState({});
+          } else {
+            btn.disabled = false; btn.textContent = 'Publikasikan';
+            alert('⚠️ Gagal menyimpan ke server (kemungkinan koneksi internet bermasalah). Tulisanmu masih ada di sini — cek koneksi lalu tekan Publikasikan lagi.');
+          }
         }},'Publikasikan'),
         el('button',{class:'btn-secondary',onClick:()=>removeModal(m)},'Batal')
       )
@@ -2605,14 +2872,25 @@ function getTodayLangkahKey(){
   return 'langkah_' + getTodayMoodKey().replace('mood_','');
 }
 
-// ─── HUTAN PEMBERDAYAAN (26 pohon per cabang + 1 pohon Regional C gabungan = 27) ─
+// ─── HUTAN PEMBERDAYAAN (26 pohon per cabang + 1 pohon Tim Regional = 27) ─
 let hutanSceneToken = 0; // token untuk memastikan hanya render 3D terakhir yang aktif (hindari WebGL context bocor)
 const CABANG_LIST = [
   "Blora","Penawangan","Kedungjati","Toroh","Wirosari","Sale","Rembang","Sluke",
   "Banjarmasin Barat","Martapura","Rantau","Jepara","Tayu","Tambakromo","Kudus",
   "Demak","Pelaihari","Barabai","Amuntai","Karangawen","Randublatung","Paringin",
-  "Tanjung","Palangka Raya","Batulicin","Kapuas"
+  "Tanjung","Palangka Raya","Batulicin","Kapuas","Regional C"
 ];
+
+// Nama tampilan pohon di peta hutan (khusus Regional C ditampilkan sebagai "Tim Regional")
+function displayNamaCabang(cabang){
+  return cabang === 'Regional C' ? 'Tim Regional' : cabang;
+}
+
+// Cocokkan input cabang staf (bisa huruf besar/kecil apa saja) ke nama baku di CABANG_LIST
+function findCanonicalCabang(raw){
+  const norm = (raw||'').trim().toLowerCase();
+  return CABANG_LIST.find(c => c.toLowerCase() === norm) || null;
+}
 
 // Tahapan pertumbuhan pohon per cabang (berdasarkan siraman staf cabang itu sendiri)
 const TREE_STAGES = [
@@ -2623,17 +2901,6 @@ const TREE_STAGES = [
   {min:50,  label:"Berbunga",      emoji:"🌸"},
   {min:75,  label:"Berbuah",       emoji:"🍎"},
   {min:100, label:"Pohon Rindang", emoji:"🌳"},
-];
-
-// Tahapan Pohon Regional C — akumulasi seluruh 26 cabang, ambang jauh lebih besar
-const TREE_STAGES_REGIONAL = [
-  {min:0,    label:"Benih",         emoji:"🌰"},
-  {min:75,   label:"Tunas",         emoji:"🌱"},
-  {min:250,  label:"Tanaman Muda",  emoji:"🌿"},
-  {min:500,  label:"Pohon Tumbuh",  emoji:"🌳"},
-  {min:850,  label:"Berbunga",      emoji:"🌸"},
-  {min:1250, label:"Berbuah",       emoji:"🍎"},
-  {min:1700, label:"Pohon Rindang", emoji:"🌳"},
 ];
 
 function getTreeStage(siraman, stages){
@@ -2652,9 +2919,10 @@ function getTreeStage(siraman, stages){
 }
 
 // Menyiram pohon cabang milik staf yang login (1 cabang = 1 pohon, jadi kompetisi antar cabang)
+// Cocokkan nama cabang tanpa peduli huruf besar/kecil, lalu simpan pakai nama baku di CABANG_LIST
 async function tambahSiramanCabang(cabang, jumlah){
-  const key = (cabang||'').trim();
-  if(!key || !CABANG_LIST.includes(key)) return null;
+  const key = findCanonicalCabang(cabang);
+  if(!key) return null;
   try{
     const r = await fetch(`${FB_URL}/hutan/${encodeURIComponent(key)}/siraman.json`);
     const current = (await r.json()) || 0;
@@ -2807,9 +3075,10 @@ function renderLangkahGate(onDone){
     contentArea.appendChild(animWrap);
 
     contentArea.appendChild(el('p',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'18px',color:'var(--green5)',lineHeight:'1.6',marginBottom:'10px',fontStyle:'italic'}}, quote));
-    if(cabang && CABANG_LIST.includes(cabang.trim())){
+    const canonCabang = findCanonicalCabang(cabang);
+    if(canonCabang){
       contentArea.appendChild(el('div',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'6px'}},
-        `+${jumlahAir} siraman untuk pohon cabang ${cabang} 🌳`));
+        `+${jumlahAir} siraman untuk pohon ${displayNamaCabang(canonCabang)} 🌳`));
     }
     contentArea.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)'}},'Menuju Hutan Pemberdayaan...'));
 
@@ -2840,38 +3109,19 @@ function renderHutanPemberdayaan(){
   const hero = el('div',{style:{textAlign:'center',marginBottom:'16px'}});
   hero.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'26px',color:'var(--green5)',marginBottom:'6px'}},'🌳 Hutan Pemberdayaan'));
   hero.appendChild(el('p',{style:{fontSize:'13px',color:'var(--text2)',maxWidth:'560px',margin:'0 auto',lineHeight:'1.7'}},
-    '27 pohon tumbuh di sini — satu pohon untuk tiap cabang, dan satu pohon besar milik seluruh Regional C. Setiap Mood Check dan Langkah Baikku Hari Ini menyiram pohon cabangmu sendiri. Cabang mana yang lebih dulu jadi Pohon Rindang?'));
+    '27 pohon tumbuh di sini — satu pohon untuk tiap cabang, termasuk satu pohon untuk Tim Regional. Setiap Mood Check dan Langkah Baikku Hari Ini menyiram pohon cabangmu sendiri. Cabang mana yang lebih dulu jadi Pohon Rindang?'));
   wrap.appendChild(hero);
 
-  const myCabang = (state.user && state.user.cabang || '').trim();
+  const myCabang = findCanonicalCabang(state.user && state.user.cabang);
   const hutanData = state.data.hutan || {};
-  const totalSiramanRegional = CABANG_LIST.reduce((sum,c)=> sum + ((hutanData[c] && hutanData[c].siraman) || 0), 0);
-  const regionalStage = getTreeStage(totalSiramanRegional, TREE_STAGES_REGIONAL);
 
-  // ── Hero: Pohon Regional C (gabungan seluruh cabang) ──
-  const regionalCard = el('div',{style:{
-    background:'linear-gradient(160deg,var(--green2),var(--green1))',
-    border:'2px solid var(--green4)', borderRadius:'20px', padding:'20px 18px',
-    textAlign:'center', marginBottom:'18px',
-  }});
-  regionalCard.appendChild(el('div',{style:{fontSize:'10px',color:'var(--green5)',fontWeight:'600',letterSpacing:'0.5px',marginBottom:'4px'}},'POHON GABUNGAN SELURUH REGIONAL C'));
-  regionalCard.appendChild(el('div',{style:{fontSize:'56px',margin:'4px 0',animation:'treeSway 3.5s ease-in-out infinite',display:'inline-block'}}, regionalStage.emoji));
-  regionalCard.appendChild(el('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'8px'}}, `Tahap: ${regionalStage.label}`));
-  const regBarBg = el('div',{style:{background:'white',borderRadius:'8px',height:'7px',overflow:'hidden',maxWidth:'320px',margin:'0 auto 6px'}});
-  const regBarFill = el('div',{style:{background:'var(--green4)',height:'100%',width:regionalStage.progressPct+'%',transition:'width 0.6s ease'}});
-  regBarBg.appendChild(regBarFill);
-  regionalCard.appendChild(regBarBg);
-  regionalCard.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)'}},
-    regionalStage.next ? `${totalSiramanRegional}/${regionalStage.next.min} siraman gabungan` : `${totalSiramanRegional} siraman · Maksimal 🎉`));
-  wrap.appendChild(regionalCard);
-
-  // ── Scene hutan 3D: 26 pohon cabang + 1 pohon Regional C, dalam ruang 3D nyata ──
+  // ── Scene hutan 3D: 27 pohon (26 cabang + Tim Regional), dalam ruang 3D nyata ──
   hutanSceneToken++;
   const myToken = hutanSceneToken;
   const scene3d = el('div',{id:'hutan3d-'+myToken, class:'forest-scene-3d'});
   scene3d.appendChild(el('div',{class:'forest-3d-loading'},'🌱 Menumbuhkan hutan 3D...'));
   wrap.appendChild(scene3d);
-  wrap.appendChild(el('div',{class:'forest-3d-hint'},'🖱️ Seret untuk memutar pandangan · Scroll untuk zoom'));
+  wrap.appendChild(el('div',{class:'forest-3d-hint'},'Seret untuk menoleh · Cubit dua jari (atau gulir mouse) untuk berjalan menyusuri hutan'));
 
   // Ambil penanda "baru saja menyiram" (diset saat menyelesaikan Langkah Baikku Hari Ini)
   let waterFlag = null;
@@ -2947,9 +3197,9 @@ function loadThreeJS(){
 }
 
 // Membangun satu pohon 3D sesuai tahap pertumbuhan (0=Benih ... 6=Pohon Rindang)
-function buildTreeGroup3D(THREE, stageIndex, isMine, isRegional){
+function buildTreeGroup3D(THREE, stageIndex, isMine, isRegionalTeam){
   const g = new THREE.Group();
-  const sizeMul = isRegional ? 1.75 : 1;
+  const sizeMul = 1;
 
   if(stageIndex<=0){
     const seed = new THREE.Mesh(new THREE.SphereGeometry(0.3*sizeMul,8,8), new THREE.MeshStandardMaterial({color:0x8a5a2b, roughness:0.9}));
@@ -3033,7 +3283,7 @@ function buildTreeGroup3D(THREE, stageIndex, isMine, isRegional){
     ring.rotation.x = -Math.PI/2;
     ring.position.y = 0.05;
     g.add(ring);
-  } else if(isRegional){
+  } else if(isRegionalTeam){
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(canopyR*0.95, canopyR*1.1, 28),
       new THREE.MeshBasicMaterial({color:0xa8d5a8, side:THREE.DoubleSide, transparent:true, opacity:0.45})
@@ -3122,11 +3372,15 @@ async function initHutanScene3D(container, hutanData, myCabang, waterFlag, token
   scene.background = new THREE.Color(0xdff3e6);
   scene.fog = new THREE.Fog(0xdcefe0, 34, 130);
 
-  const camera = new THREE.PerspectiveCamera(42, width/height, 0.1, 500);
-  const camState = {angle:0.15, dist:46, height:20, dragging:false, lastX:0, autoRotate:true};
+  const camera = new THREE.PerspectiveCamera(60, width/height, 0.1, 500);
+  // Kamera setinggi mata, berdiri DI DALAM hutan menghadap ke dalam — bukan melihat dari atas seperti peta
+  const camState = {x:0, y:4.6, z:16, yaw:0, pitch:-0.05, dragging:false, lastX:0, lastY:0, autoLook:true};
   function updateCam(){
-    camera.position.set(Math.sin(camState.angle)*camState.dist, camState.height, Math.cos(camState.angle)*camState.dist - 5);
-    camera.lookAt(0, 10, -20);
+    camera.position.set(camState.x, camState.y, camState.z);
+    const dirX = Math.sin(camState.yaw)*Math.cos(camState.pitch);
+    const dirY = Math.sin(camState.pitch);
+    const dirZ = -Math.cos(camState.yaw)*Math.cos(camState.pitch);
+    camera.lookAt(camState.x+dirX*10, camState.y+dirY*10, camState.z+dirZ*10);
   }
   updateCam();
 
@@ -3177,56 +3431,95 @@ async function initHutanScene3D(container, hutanData, myCabang, waterFlag, token
 
   const treeMeshes = {};
   const cols = 6;
+  const cellW = 66/cols;
   CABANG_LIST.forEach((cabang,i)=>{
     const row = Math.floor(i/cols);
     const col = i%cols;
     const itemsInRow = Math.min(cols, CABANG_LIST.length-row*cols);
-    const spreadX = 66;
-    const x = ((col+0.5)/itemsInRow - 0.5) * spreadX + (Math.random()-0.5)*3;
-    const z = -row*13 - 6 + (Math.random()-0.5)*3;
+    const rowStagger = (row%2===0) ? 0 : cellW*0.5;
+    const baseX = ((col+0.5)/itemsInRow - 0.5)*66 + rowStagger;
+    // Sebaran acak yang cukup besar supaya tidak terlihat seperti barisan rapi dari atas — terasa seperti hutan asli
+    const x = baseX + (Math.random()-0.5)*7.5;
+    const z = -row*13 - 8 + (Math.random()-0.5)*7;
 
     const siraman = (hutanData[cabang] && hutanData[cabang].siraman) || 0;
     const stage = getTreeStage(siraman);
     const isMine = cabang===myCabang;
+    const isRegionalTeam = cabang==='Regional C';
 
-    const tg = buildTreeGroup3D(THREE, stage.index, isMine, false);
+    const tg = buildTreeGroup3D(THREE, stage.index, isMine, isRegionalTeam);
     tg.position.set(x, 0, z);
     scene.add(tg);
 
-    const label = makeLabelSprite3D(THREE, cabang, isMine);
+    const label = makeLabelSprite3D(THREE, displayNamaCabang(cabang), isMine);
     label.position.set(x, tg.userData.topY + 1.1, z);
     scene.add(label);
 
     treeMeshes[cabang] = tg;
   });
 
-  // Pohon Regional C — gabungan seluruh cabang, ditempatkan besar di tengah belakang
-  const totalSiramanRegional = CABANG_LIST.reduce((s,c)=> s + ((hutanData[c] && hutanData[c].siraman)||0), 0);
-  const regionalStage = getTreeStage(totalSiramanRegional, TREE_STAGES_REGIONAL);
-  const regionalTree = buildTreeGroup3D(THREE, regionalStage.index, false, true);
-  regionalTree.position.set(0, 0, -78);
-  scene.add(regionalTree);
-  const regLabel = makeLabelSprite3D(THREE, '🌳 Regional C', false);
-  regLabel.position.set(0, regionalTree.userData.topY+1.6, -78);
-  scene.add(regLabel);
-
-  // Interaksi: seret untuk memutar kamera, scroll untuk zoom
+  // Interaksi: seret jari/mouse untuk menoleh; cubit dua jari (atau scroll di komputer) untuk berjalan maju-mundur
   const dom = renderer.domElement;
-  const onPointerDown = e=>{ camState.dragging=true; camState.lastX=e.clientX; camState.autoRotate=false; dom.style.cursor='grabbing'; };
-  const onPointerUp = ()=>{ camState.dragging=false; dom.style.cursor='grab'; };
+  const activePointers = new Map();
+  let pinchStartDist = null;
+  const clampX = v => Math.max(-48, Math.min(48, v));
+  const clampZ = v => Math.max(-95, Math.min(45, v));
+  const walkStep = step => {
+    const dirX = Math.sin(camState.yaw), dirZ = -Math.cos(camState.yaw);
+    camState.x = clampX(camState.x + dirX*step);
+    camState.z = clampZ(camState.z + dirZ*step);
+    updateCam();
+  };
+
+  const onPointerDown = e=>{
+    dom.setPointerCapture && dom.setPointerCapture(e.pointerId);
+    activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    camState.autoLook = false;
+    if(activePointers.size===1){
+      camState.dragging = true; camState.lastX=e.clientX; camState.lastY=e.clientY;
+      dom.style.cursor='grabbing';
+    } else if(activePointers.size===2){
+      camState.dragging = false;
+      const pts = [...activePointers.values()];
+      pinchStartDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    }
+  };
+  const onPointerUp = e=>{
+    activePointers.delete(e.pointerId);
+    pinchStartDist = null;
+    if(activePointers.size===0){
+      camState.dragging = false; dom.style.cursor='grab';
+    } else if(activePointers.size===1){
+      const [remaining] = activePointers.values();
+      camState.dragging = true; camState.lastX = remaining.x; camState.lastY = remaining.y;
+    }
+  };
   const onPointerMove = e=>{
+    if(!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+    if(activePointers.size>=2){
+      // Dua jari: jarak antar jari mengatur jalan maju (jari merenggang) / mundur (jari mendekat)
+      const pts = [...activePointers.values()];
+      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      if(pinchStartDist!=null) walkStep((dist - pinchStartDist)*0.12);
+      pinchStartDist = dist;
+      return;
+    }
     if(!camState.dragging) return;
-    camState.angle += (e.clientX - camState.lastX)*0.005;
+    camState.yaw += (e.clientX - camState.lastX)*0.006;
+    camState.pitch = Math.max(-0.5, Math.min(0.45, camState.pitch - (e.clientY - camState.lastY)*0.004));
     camState.lastX = e.clientX;
+    camState.lastY = e.clientY;
     updateCam();
   };
   const onWheel = e=>{
     e.preventDefault();
-    camState.dist = Math.min(120, Math.max(16, camState.dist + e.deltaY*0.05));
-    updateCam();
+    walkStep(-e.deltaY*0.035);
   };
   dom.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
   window.addEventListener('pointermove', onPointerMove);
   dom.addEventListener('wheel', onWheel, {passive:false});
 
@@ -3239,17 +3532,17 @@ async function initHutanScene3D(container, hutanData, myCabang, waterFlag, token
   function animate(){
     if(token !== hutanSceneToken){
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
       window.removeEventListener('pointermove', onPointerMove);
       renderer.dispose();
       return;
     }
     requestAnimationFrame(animate);
     t += 0.016;
-    if(camState.autoRotate){ camState.angle += 0.0015; updateCam(); }
+    if(camState.autoLook){ camState.yaw = Math.sin(t*0.08)*0.35; updateCam(); }
     Object.values(treeMeshes).forEach((tg,i)=>{
       if(tg.userData.canopyGroup) tg.userData.canopyGroup.rotation.z = Math.sin(t*0.8+i)*0.045;
     });
-    if(regionalTree.userData.canopyGroup) regionalTree.userData.canopyGroup.rotation.z = Math.sin(t*0.7)*0.04;
     if(fireflies){
       const posAttr = fireflies.geometry.attributes.position;
       const baseY = fireflies.userData.baseY;
@@ -3418,7 +3711,7 @@ function renderHutanFallback2D(container, hutanData, myCabang){
       fontSize:rc.labelSize, color: isMine ? 'var(--green5)' : 'var(--text1)',
       fontWeight: isMine ? '700' : '500', whiteSpace:'nowrap', marginTop:'2px',
       background: isMine ? 'rgba(255,255,255,0.85)' : 'transparent', borderRadius:'6px', padding: isMine?'1px 4px':'0',
-    }}, cabang));
+    }}, displayNamaCabang(cabang)));
     ground.appendChild(itemWrap);
   });
 }
@@ -3589,8 +3882,8 @@ function renderLanding(){
   const h1 = el('h1',{class:'landing-title'});
   h1.innerHTML='Comdev<br><span style="color:var(--green5)">KOMIDA</span>';
   left.appendChild(h1);
-  left.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'18px',color:'var(--text3)',fontStyle:'italic',marginBottom:'24px'}},'Selangkah Lebih Berdampak'));
-  left.appendChild(el('p',{class:'landing-desc'},'Pusat Edukasi Staf & Anggota KOMIDA — belajar sederhana untuk berkembang bersama. Tingkatkan kualitas hidup perempuan Indonesia melalui literasi dan pemberdayaan.'));
+  left.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'18px',color:'var(--text3)',fontStyle:'italic',marginBottom:'24px'}},'Menumbuhkan Kepedulian, Menguatkan Pemberdayaan'));
+  left.appendChild(el('p',{class:'landing-desc'},'Belajar sederhana untuk berkembang bersama. Tingkatkan kualitas hidup perempuan Indonesia melalui literasi dan pemberdayaan.'));
   const ltags = el('div',{class:'landing-tags'});
   ["Modul Literasi","Forum Diskusi","Daily Mood Check","Quiz","E-Book"].forEach(t=>ltags.appendChild(el('span',{class:'landing-tag'},t)));
   left.appendChild(ltags);
@@ -4230,6 +4523,7 @@ function render(){
   switch(state.page){
     case 'beranda': pageEl=renderBeranda(); break;
     case 'hutan':   pageEl=renderHutanPemberdayaan(); break;
+    case 'pemberdaya': pageEl=renderSudutPemberdaya(); break;
     case 'quiz':    pageEl=renderQuiz();   break;
     case 'ebook':   pageEl=renderEbook();  break;
     case 'profil':  pageEl=renderProfil(); break;
