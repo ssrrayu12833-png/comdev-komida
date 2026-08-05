@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Comdev KOMIDA</title>
+<title>KOMIDA SMART CLUB</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMzAiIGZpbGw9IiNmMGY3ZjAiIHN0cm9rZT0iIzZhYjM2YSIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPGVsbGlwc2UgY3g9IjMyIiBjeT0iMjgiIHJ4PSIxMiIgcnk9IjE0IiBmaWxsPSIjNmFiMzZhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgPGVsbGlwc2UgY3g9IjIyIiBjeT0iMzQiIHJ4PSI5IiByeT0iMTEiIGZpbGw9IiNhOGQ1YTgiIG9wYWNpdHk9IjAuOCIvPgogIDxlbGxpcHNlIGN4PSI0MiIgY3k9IjM0IiByeD0iOSIgcnk9IjExIiBmaWxsPSIjYThkNWE4IiBvcGFjaXR5PSIwLjgiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjQwIiByPSI3IiBmaWxsPSIjZjllY2EwIiBzdHJva2U9IiNjOGE4MDAiIHN0cm9rZS13aWR0aD0iMSIvPgogIDx0ZXh0IHg9IjMyIiB5PSI0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSI4IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzNkOGIzZCIgZm9udC1mYW1pbHk9InNlcmlmIj5LPC90ZXh0Pgo8L3N2Zz4=" type="image/svg+xml"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
@@ -277,6 +277,9 @@ input:focus,textarea:focus,select:focus{border-color:var(--green4);}
 .search-bar-input{width:100%;padding:10px 16px 10px 40px;border:1.5px solid var(--green2);border-radius:24px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;background:white;color:var(--text1);transition:border-color .2s;}
 .search-bar-input:focus{border-color:var(--green4);}
 .search-bar-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--text3);}
+mark.tanya-mark{background:var(--yellow3);color:var(--text1);padding:0 2px;border-radius:3px;font-weight:500;}
+.tanya-chip{cursor:pointer;font-family:'DM Sans',sans-serif;background:none;transition:all .15s;}
+.tanya-chip:hover{background:var(--green4)!important;color:#fff!important;border-color:var(--green4)!important;}
 .search-no-result{text-align:center;padding:40px 0;color:var(--text3);font-size:14px;}
 /* Floating WA button */
 .floating-wa{position:fixed;bottom:24px;right:24px;width:54px;height:54px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(37,211,102,.4);z-index:500;text-decoration:none;font-size:26px;transition:all .2s;}
@@ -815,6 +818,7 @@ function renderSidebar() {
     {id:'beranda',icon:'🏠',label:'Beranda'},
     {id:'hutan',icon:'🌳',label:'Hutan Pemberdayaan'},
     {id:'pemberdaya',icon:'📰',label:'Sudut Pemberdaya'},
+    {id:'tanya',icon:'🤖',label:'Tanya KMC'},
     {id:'quiz',icon:'🧩',label:'Quiz'},
     {id:'ebook',icon:'📚',label:'E-Book'},
     {id:'profil',icon:'👤',label:'Profil Saya'},
@@ -827,8 +831,8 @@ function renderSidebar() {
   logoImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMzAiIGZpbGw9IiNmMGY3ZjAiIHN0cm9rZT0iIzZhYjM2YSIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPGVsbGlwc2UgY3g9IjMyIiBjeT0iMjgiIHJ4PSIxMiIgcnk9IjE0IiBmaWxsPSIjNmFiMzZhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgPGVsbGlwc2UgY3g9IjIyIiBjeT0iMzQiIHJ4PSI5IiByeT0iMTEiIGZpbGw9IiNhOGQ1YTgiIG9wYWNpdHk9IjAuOCIvPgogIDxlbGxpcHNlIGN4PSI0MiIgY3k9IjM0IiByeD0iOSIgcnk9IjExIiBmaWxsPSIjYThkNWE4IiBvcGFjaXR5PSIwLjgiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjQwIiByPSI3IiBmaWxsPSIjZjllY2EwIiBzdHJva2U9IiNjOGE4MDAiIHN0cm9rZS13aWR0aD0iMSIvPgogIDx0ZXh0IHg9IjMyIiB5PSI0NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSI4IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzNkOGIzZCIgZm9udC1mYW1pbHk9InNlcmlmIj5LPC90ZXh0Pgo8L3N2Zz4=';
   logoImg.style.cssText = 'width:36px;height:36px;border-radius:50%;';
   const logoText = el('div',{});
-  logoText.appendChild(el('div',{class:'label'},'Comdev'));
-  logoText.appendChild(el('h2',{},'KOMIDA'));
+  logoText.appendChild(el('div',{class:'label'},'KOMIDA'));
+  logoText.appendChild(el('h2',{},'SMART CLUB'));
   logoRow.appendChild(logoImg);
   logoRow.appendChild(logoText);
   logo.appendChild(logoRow);
@@ -871,7 +875,7 @@ function toggleSidebar(){
 function renderTopbar() {
   const {page, notifications} = state;
   const isAdmin = state.user && state.user.role==='comdev komida';
-  const labels = {beranda:'🏠 Beranda',hutan:'🌳 Hutan Pemberdayaan',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel',profil:'👤 Profil Saya'};
+  const labels = {beranda:'🏠 Beranda',hutan:'🌳 Hutan Pemberdayaan',pemberdaya:'📰 Sudut Pemberdaya',tanya:'🤖 Tanya KMC',quiz:'🧩 Quiz',ebook:'📚 E-Book',admin:'⚙️ Admin Panel',profil:'👤 Profil Saya'};
   const bar = el('div',{id:'topbar'});
   const left = el('div',{style:{display:'flex',alignItems:'center',gap:'10px',flex:'1'}});
   left.appendChild(el('button',{id:'hamburger',onClick:toggleSidebar},'☰'));
@@ -3880,7 +3884,7 @@ function renderLanding(){
   const left = el('div');
   left.appendChild(el('div',{style:{fontSize:'11px',color:'var(--green4)',letterSpacing:'2px',textTransform:'uppercase',marginBottom:'12px'}},'Koperasi Mitra Dhuafa'));
   const h1 = el('h1',{class:'landing-title'});
-  h1.innerHTML='Comdev<br><span style="color:var(--green5)">KOMIDA</span>';
+  h1.innerHTML='KOMIDA<br><span style="color:var(--green5)">SMART CLUB</span>';
   left.appendChild(h1);
   left.appendChild(el('div',{style:{fontFamily:"'Cormorant Garamond',serif",fontSize:'18px',color:'var(--text3)',fontStyle:'italic',marginBottom:'24px'}},'Menumbuhkan Kepedulian, Menguatkan Pemberdayaan'));
   left.appendChild(el('p',{class:'landing-desc'},'Belajar sederhana untuk berkembang bersama. Tingkatkan kualitas hidup perempuan Indonesia melalui literasi dan pemberdayaan.'));
@@ -4143,7 +4147,7 @@ function renderLanding(){
   grid.appendChild(rbox);
   body.appendChild(grid);
   root2.appendChild(body);
-  root2.appendChild(el('div',{class:'landing-footer'},'© 2025 Comdev KOMIDA · Koperasi Mitra Dhuafa · Selangkah Lebih Berdampak 🌿'));
+  root2.appendChild(el('div',{class:'landing-footer'},'© 2025 KOMIDA SMART CLUB · Program Comdev Koperasi Mitra Dhuafa · Selangkah Lebih Berdampak 🌿'));
   return root2;
 }
 
@@ -4467,6 +4471,234 @@ function renderProfil() {
   return wrap;
 }
 
+// ─── TANYA KMC — mesin cari & jawab dari artikel yang sudah dirilis ──────────
+const TANYA_STOPWORDS = new Set(['apa','apakah','adalah','yang','di','ke','dari','untuk','dengan','itu','ini','atau','dan','pada','dalam','bagaimana','mengapa','kenapa','siapa','kapan','dimana','bisakah','bisa','tolong','coba','jelaskan','tentang','saya','kita','kami','anda','kamu','nya','akan','oleh','juga','saja','sebagai','karena','jika','kalau','tidak','bukan','sudah','belum','ada','banyak','sekali','sangat','sebuah','para','yaitu','yakni','maka','agar','supaya','begitu','seperti','apa2','gimana']);
+
+// Sinonim ringkas seputar topik pemberdayaan & kemiskinan, biar pencarian lebih "nangkep" maksud pertanyaan
+const TANYA_SINONIM = {
+  'miskin':['miskin','kemiskinan','melarat','dhuafa','papa','kekurangan','pra sejahtera'],
+  'ekonomi':['ekonomi','keuangan','uang','modal','pendapatan','penghasilan','tabungan','hutang'],
+  'kesehatan':['kesehatan','sakit','penyakit','gizi','stunting'],
+  'pendidikan':['pendidikan','sekolah','belajar','literasi'],
+  'kekerasan':['kekerasan','kdrt','pelecehan','perlindungan'],
+  'usaha':['usaha','bisnis','wirausaha','umkm','dagang','modal usaha'],
+  'keluarga':['keluarga','rumah tangga','suami','istri','anak'],
+  'perempuan':['perempuan','wanita','ibu','nasabah'],
+};
+
+function tanyaEscapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+function tanyaTokenize(q){
+  return (q||'').toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu,' ')
+    .split(/\s+/)
+    .filter(w=>w.length>2 && !TANYA_STOPWORDS.has(w));
+}
+
+function tanyaExpandKeywords(tokens){
+  const set = new Set(tokens);
+  tokens.forEach(t=>{
+    Object.entries(TANYA_SINONIM).forEach(([key,arr])=>{
+      if(key===t || arr.includes(t)){ set.add(key); arr.forEach(a=>set.add(a)); }
+    });
+  });
+  return [...set];
+}
+
+function tanyaHighlight(text, keywords){
+  let out = text;
+  keywords.forEach(kw=>{
+    if(kw.length<3) return;
+    const re = new RegExp('('+tanyaEscapeRegex(kw)+')','gi');
+    out = out.replace(re, '<mark class="tanya-mark">$1</mark>');
+  });
+  return out;
+}
+
+// Kumpulkan semua "artikel" yang bisa dijadikan sumber jawaban:
+// artikel Sudut Pemberdaya + materi di Hutan Pemberdayaan
+function tanyaCollectCorpus(){
+  const data = state.data;
+  const docs = [];
+  (data.pemberdayaArtikel||[]).forEach(a=>{
+    docs.push({
+      title: a.title||'(tanpa judul)',
+      plain: (a.content||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' '),
+      meta: `📰 Sudut Pemberdaya${a.category?' · '+a.category:''}`,
+      onOpen: ()=>setState({page:'pemberdaya',pemberdayaView:'detail',activeArtikel:a})
+    });
+  });
+  Object.entries(data.modules||{}).forEach(([modName,mod])=>{
+    Object.entries((mod||{}).subModuls||{}).forEach(([subName,sub])=>{
+      (sub.materis||[]).forEach(m=>{
+        docs.push({
+          title: m.title||'(tanpa judul)',
+          plain: (m.content||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' '),
+          meta: `🌳 Hutan Pemberdayaan · ${modName} › ${subName}`,
+          onOpen: ()=>setState({page:'hutan',activeModule:modName,activeSub:subName,activeMateri:m,modulView:'materiDetail'})
+        });
+      });
+    });
+  });
+  return docs;
+}
+
+// Cari jawaban: skor tiap artikel, lalu ambil kalimat paling relevan sebagai "jawaban"
+function tanyaSearch(query){
+  const rawKeywords = tanyaTokenize(query);
+  if(rawKeywords.length===0) return {keywords:[], docs:[]};
+  const keywords = tanyaExpandKeywords(rawKeywords);
+  const qLower = query.toLowerCase().trim();
+  const docs = tanyaCollectCorpus();
+  const scored = [];
+
+  docs.forEach(d=>{
+    const titleLower = d.title.toLowerCase();
+    const bodyLower = d.plain.toLowerCase();
+    let score = 0;
+    keywords.forEach(kw=>{
+      if(titleLower.includes(kw)) score += 4;
+      const occ = bodyLower.split(kw).length - 1;
+      score += occ;
+    });
+    if(qLower.length>4 && bodyLower.includes(qLower)) score += 8;
+    if(score<=0) return;
+
+    const sentences = d.plain.replace(/\s+/g,' ').trim().split(/(?<=[.!?])\s+/).filter(s=>s.length>15);
+    let scoredSentences = sentences.map((s,i)=>{
+      const sl = s.toLowerCase();
+      let sscore = 0;
+      keywords.forEach(kw=>{ if(sl.includes(kw)) sscore+=1; });
+      return {s,i,sscore};
+    }).filter(x=>x.sscore>0);
+
+    scoredSentences.sort((a,b)=>b.sscore-a.sscore);
+    let chosen = scoredSentences.slice(0,3);
+    if(chosen.length===0) chosen = sentences.slice(0,2).map((s,i)=>({s,i,sscore:0}));
+    // Susun ulang sesuai urutan asli di artikel biar nyambung & mengalir seperti penjelasan
+    chosen.sort((a,b)=>a.i-b.i);
+    let snippet = chosen.map(x=>x.s.trim()).join(' ');
+    // Kalau kepanjangan, potong per-kalimat (bukan potong di tengah kata)
+    if(snippet.length>550){
+      const parts = snippet.split(/(?<=[.!?])\s+/);
+      let acc='';
+      for(const p of parts){ if((acc+' '+p).trim().length>550) break; acc = (acc?acc+' ':'')+p; }
+      snippet = acc || snippet.slice(0,550);
+    }
+
+    scored.push({...d, score, snippet: snippet || 'Isi artikel belum tersedia.'});
+  });
+
+  scored.sort((a,b)=>b.score-a.score);
+  return {keywords, docs:scored};
+}
+
+// Kalimat pembuka jawaban, menyesuaikan jenis pertanyaan biar terasa seperti penjelasan
+function tanyaLeadIn(query){
+  const q = query.toLowerCase();
+  if(/kenapa|mengapa|penyebab/.test(q)) return 'Berdasarkan artikel yang sudah dirilis, ini penjelasan penyebabnya:';
+  if(/bagaimana|cara|langkah/.test(q)) return 'Berdasarkan artikel yang sudah dirilis, ini caranya:';
+  if(/apa itu|apakah|^apa\b|\bapa\b/.test(q)) return 'Berdasarkan artikel yang sudah dirilis, ini penjelasannya:';
+  if(/siapa/.test(q)) return 'Berdasarkan artikel yang sudah dirilis:';
+  if(/kapan/.test(q)) return 'Berdasarkan artikel yang sudah dirilis:';
+  return 'Berdasarkan artikel yang sudah dirilis, ini yang bisa KMC temukan:';
+}
+
+// ─── PAGE: TANYA KMC ──────────────────────────────────────────────────────────
+function renderTanyaKMC(){
+  const wrap = el('div',{class:'page-pad fade-in'});
+  const hdr = el('div',{class:'page-header'});
+  const ht = el('div');
+  ht.appendChild(el('div',{class:'page-title'},'🤖 Tanya KMC'));
+  ht.appendChild(el('p',{class:'page-sub'},'Ketik pertanyaanmu — KMC akan mencari jawabannya dari artikel yang sudah dirilis di Sudut Pemberdaya & Hutan Pemberdayaan'));
+  hdr.appendChild(ht);
+  wrap.appendChild(hdr);
+
+  const searchRow = el('div',{style:{display:'flex',gap:'10px',marginBottom:'14px',flexWrap:'wrap'}});
+  const inputWrap = el('div',{class:'search-bar-wrap',style:{flex:'1',marginBottom:'0',minWidth:'220px'}});
+  inputWrap.appendChild(el('span',{class:'search-bar-icon'},'🔎'));
+  const input = el('input',{type:'text',class:'search-bar-input',placeholder:'Contoh: apa penyebab kemiskinan?'});
+  inputWrap.appendChild(input);
+  searchRow.appendChild(inputWrap);
+  const askBtn = el('button',{class:'btn-primary',style:{flexShrink:'0'}},'Tanya →');
+  searchRow.appendChild(askBtn);
+  wrap.appendChild(searchRow);
+
+  const examples = ['Apa penyebab kemiskinan?','Bagaimana cara mengatur keuangan keluarga?','Apa itu program Comdev KOMIDA?','Cara mengatasi stress'];
+  const chipsWrap = el('div',{style:{display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'28px'}});
+  examples.forEach(ex=>{
+    const chip = el('button',{class:'landing-tag tanya-chip',onClick:()=>{ input.value=ex; runTanya(ex); }},ex);
+    chipsWrap.appendChild(chip);
+  });
+  wrap.appendChild(chipsWrap);
+
+  const resultArea = el('div',{});
+  wrap.appendChild(resultArea);
+
+  function runTanya(qRaw){
+    const query = (qRaw||'').trim();
+    resultArea.innerHTML = '';
+    if(query.length<2) return;
+
+    const {keywords, docs} = tanyaSearch(query);
+    if(keywords.length===0 || docs.length===0){
+      const empty = el('div',{class:'card',style:{textAlign:'center',padding:'40px 20px'}});
+      empty.appendChild(el('div',{style:{fontSize:'32px',marginBottom:'10px'}},'🤔'));
+      empty.appendChild(el('div',{style:{fontSize:'14px',color:'var(--text2)',marginBottom:'4px'}},`Belum ada artikel yang membahas "${query}"`));
+      empty.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)'}},'Coba kata kunci lain, atau tulis artikel baru di Sudut Pemberdaya 📰'));
+      resultArea.appendChild(empty);
+      return;
+    }
+
+    const bestDoc = docs[0];
+    const related = docs.slice(1,4);
+
+    const answerCard = el('div',{class:'card',style:{background:'linear-gradient(135deg,var(--green1),var(--yellow1))',border:'1px solid var(--green3)',marginBottom:'20px'}});
+    answerCard.appendChild(el('div',{style:{fontSize:'11px',color:'var(--green5)',letterSpacing:'.5px',textTransform:'uppercase',marginBottom:'10px',fontWeight:'500'}},'🤖 Jawaban KMC'));
+    answerCard.appendChild(el('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'8px',fontWeight:'500'}},tanyaLeadIn(query)));
+    const answerText = el('div',{style:{fontSize:'15px',color:'var(--text1)',lineHeight:'1.85',marginBottom:'14px'}});
+    answerText.innerHTML = tanyaHighlight(bestDoc.snippet, keywords);
+    answerCard.appendChild(answerText);
+
+    const srcRow = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'10px',flexWrap:'wrap',borderTop:'1px solid var(--green2)',paddingTop:'12px'}});
+    const srcTxt = el('div',{});
+    const srcLine = el('div',{style:{fontSize:'12px',color:'var(--text3)'}});
+    srcLine.appendChild(document.createTextNode('📄 Sumber: '));
+    srcLine.appendChild(el('strong',{style:{color:'var(--text1)'}},bestDoc.title));
+    srcTxt.appendChild(srcLine);
+    srcTxt.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginTop:'2px'}},bestDoc.meta));
+    srcRow.appendChild(srcTxt);
+    srcRow.appendChild(el('button',{class:'btn-secondary',onClick:bestDoc.onOpen},'Baca lengkap →'));
+    answerCard.appendChild(srcRow);
+    resultArea.appendChild(answerCard);
+
+    if(related.length>0){
+      resultArea.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text3)',marginBottom:'10px'}},'Artikel terkait lainnya:'));
+      const relList = el('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}});
+      related.forEach(r=>{
+        const rc = el('div',{class:'card',style:{cursor:'pointer',padding:'12px 16px'},onClick:r.onOpen});
+        rc.appendChild(el('div',{style:{fontSize:'13px',fontWeight:'500',color:'var(--text1)',marginBottom:'2px'}},r.title));
+        rc.appendChild(el('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'4px'}},r.meta));
+        rc.appendChild(el('div',{style:{fontSize:'12px',color:'var(--text2)',lineHeight:'1.5'}},r.snippet.slice(0,110)+'...'));
+        relList.appendChild(rc);
+      });
+      resultArea.appendChild(relList);
+    }
+  }
+
+  let tanyaTimer;
+  input.addEventListener('input', e=>{
+    clearTimeout(tanyaTimer);
+    tanyaTimer = setTimeout(()=>runTanya(e.target.value), 450);
+  });
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ clearTimeout(tanyaTimer); runTanya(input.value); }
+  });
+  askBtn.addEventListener('click', ()=>{ clearTimeout(tanyaTimer); runTanya(input.value); });
+
+  return wrap;
+}
+
 // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
 // ─── SEARCH BAR HELPER ───────────────────────────────────────────────────────
 function createSearchBar(placeholder, onSearch) {
@@ -4524,6 +4756,7 @@ function render(){
     case 'beranda': pageEl=renderBeranda(); break;
     case 'hutan':   pageEl=renderHutanPemberdayaan(); break;
     case 'pemberdaya': pageEl=renderSudutPemberdaya(); break;
+    case 'tanya':   pageEl=renderTanyaKMC(); break;
     case 'quiz':    pageEl=renderQuiz();   break;
     case 'ebook':   pageEl=renderEbook();  break;
     case 'profil':  pageEl=renderProfil(); break;
